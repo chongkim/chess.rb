@@ -1,4 +1,5 @@
 require "chess"
+require "debugger"
 
 include ChessHelper
 
@@ -54,7 +55,6 @@ describe Position do
     it { expect(Position["Re4 e3"].find("R", :e2)).to eq [] }
     it { expect(Position["Re4 Re1"].find("R", :e2)).to eq [:e4, :e1] }
     it { expect(Position["Re4 Rd1"].find("R", :e2)).to eq [:e4] }
-    it { expect(Position["Re4 e2"].find("R", :e2)).to eq [] }
     it { expect(Position["Re4 .. e2"].find("R", :e2)).to eq [:e4] }
     it { expect(Position["Ne4"].find("N", :c3)).to eq [:e4] }
     it { expect(Position["Ne4"].find("N", :e2)).to eq [] }
@@ -74,5 +74,78 @@ describe Position do
     it { expect(Position["e3"].find("P", :e5)).to eq [] }
     it { expect(Position["e5 .. f5", :ep => :f6].find("P", :f6)).to eq [:e5] }
     it { expect(Position["e4 .. g6"].find("P", :g6)).to eq [] }
+  end
+  context "#dup" do
+    let(:position) { Position.new }
+    subject { position.dup }
+    it {
+      subject[:e4] = "R"
+      expect(position[:e4]).to eq "-"
+    }
+  end
+  context ".setup" do
+    subject { Position.setup }
+    it { expect(subject.board[to_idx(:a1)..to_idx(:h1)]).to eq %w(R N B Q K B N R) }
+    its(:turn) { should == :white }
+  end
+  context "#move" do
+    context "1. e4" do
+      subject { Position.setup.
+                move("e4") }
+      its(:turn) { should == :black }
+      it { expect(subject[:e4]).to eq "P" }
+      it { expect(subject[:e2]).to eq "-" }
+      its(:fullmove) { should == 1 }
+      its(:halfmove) { should == 0 }
+      its(:ep) { should == :e3 }
+    end
+    context "1. e4 e5" do
+      subject { Position.setup.
+                move("e4").move("e5") }
+      its(:turn) { should == :white }
+      it { expect(subject[:e5]).to eq "p" }
+      it { expect(subject[:e7]).to eq "-" }
+      its(:fullmove) { should == 2 }
+      its(:halfmove) { should == 0 }
+      its(:ep) { should == :e6 }
+    end
+    context "1. e4 e5 2. Nf3" do
+      subject { Position.setup.
+                move("e4").move("e5").
+                move("Nf3") }
+      its(:turn) { should == :black }
+      it { expect(subject[:f3]).to eq "N" }
+      it { expect(subject[:g1]).to eq "-" }
+      its(:fullmove) { should == 2 }
+      its(:halfmove) { should == 1 }
+      its(:ep) { should be_nil }
+    end
+    context "1. e4 e5 2. Nf3" do
+      subject { Position.setup.
+                move("e4").move("e5").
+                move("Nf3").move("Nc6") }
+      its(:turn) { should == :white }
+      it { expect(subject[:c6]).to eq "n" }
+      it { expect(subject[:b8]).to eq "-" }
+      its(:fullmove) { should == 3 }
+      its(:halfmove) { should == 2 }
+      its(:ep) { should be_nil }
+    end
+    context "makes legal moves" do
+      it {
+        position = Position.setup
+        File.open("games/Morphy.pgn", "r") do |f|
+          while line = f.gets
+            next if line.start_with?("[")
+            line.gsub(/\b\d+\./,"").split.each do |m|
+              position = position.move(m)
+              puts
+              puts position
+              puts m
+            end
+          end
+        end
+      }
+    end
   end
 end

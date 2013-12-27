@@ -23,13 +23,20 @@ class Position
   attr_accessor :board, :turn, :ep, :castling, :halfmove, :fullmove
   INDICES = [*0..63]
   def initialize(opts={})
-    @board = %w(-)*64
     opts = { :turn => opts } if opts.is_a?(Symbol)
+    @board = opts[:board] || %w(-)*64
     @turn = opts[:turn] || :white
     @ep = opts[:ep]
     @castling = opts[:castling] || %w(K Q k q)
     @halfmove = opts[:halfmove] || 0
     @fullmove = opts[:fullmove] || 1
+  end
+  def initialize_copy(other)
+    instance_variables.each do |ivar|
+      value = other.instance_variable_get(ivar)
+      value = value.dup if value.is_a?(Array)
+      self.instance_variable_set(ivar, value)
+    end
   end
   def [](idx)
     board[to_idx(idx)]
@@ -46,6 +53,9 @@ class Position
     position
   end
   def path_clear(source_idx, target_idx)
+    source_idx = to_idx(source_idx)
+    target_idx = to_idx(target_idx)
+
     dx, dy = xydiff(source_idx, target_idx)
     return true if dx.abs != dy.abs && dx != 0 && dy != 0
     d = (dx <=> 0) + (dy <=> 0)*8
@@ -74,5 +84,62 @@ class Position
       end && path_clear(source_idx, target_idx)
     end
     target_sq.is_a?(Symbol) ? list.map { |idx| to_sq(idx) } : list
+  end
+  def self.setup
+    Position.new(:board => %w(r n b q k b n r
+                              p p p p p p p p
+                              - - - - - - - -
+                              - - - - - - - -
+                              - - - - - - - -
+                              - - - - - - - -
+                              P P P P P P P P
+                              R N B Q K B N R))
+  end
+  def []=(idx,value)
+    board[to_idx(idx)] = value
+  end
+  class IllegalMove < Exception
+    def initialize(str, position)
+      super("#{str}\n#{position}")
+    end
+  end
+  def move_piece(source_idx, target_idx)
+    source_idx = to_idx(source_idx)
+    target_idx = to_idx(target_idx)
+    board[target_idx] = board[source_idx]
+    board[source_idx] = "-"
+  end
+  class AmbiguousMove < IllegalMove; end
+  def to_s
+    @board.each_slice(8).map { |row| row.join(" ") }.join("\n")
+  end
+  def enpassant_value(piece, source_idx, target_idx)
+    (piece.upcase == "P" && 8 < (target_idx-source_idx).abs) ? to_sq(source_idx - white(8,-8)) : nil
+  end
+  def move(str)
+    illegal = IllegalMove.new(str,self)
+    position = self.dup
+    if m = str.match(/^(?<piece>[RNBQK])?(?<file>[a-h])?x?(?<sq>[a-h][1-8])\+?$/)
+      target_idx = to_idx(m[:sq])
+      piece = (m[:piece] || "P").send(white(:upcase, :downcase))
+      list = find(piece, target_idx)
+      raise illegal if list.empty?
+      raise ambiguous if 1 < list.size
+      source_idx = list[0]
+      position.move_piece(source_idx, target_idx)
+    elsif str == "O-O"
+      piece = "K".send(white(:upcase,:downcase))
+      raise illegal if !castling.include?(white("K","k"))
+      raise illegal if !path_clear(white(:e1,:e8),white(:h1,:h8))
+      position.move_piece(white(:e1,:e8), white(:g1,:g8))
+      position.move_piece(white(:h1,:h8), white(:f1,:f8))
+    else
+      raise illegal
+    end
+    position.ep = enpassant_value(piece, source_idx, target_idx)
+    position.fullmove += 1 if turn == :black
+    position.halfmove += 1 if piece.upcase != "P"
+    position.turn = white(:black, :white)
+    position
   end
 end
