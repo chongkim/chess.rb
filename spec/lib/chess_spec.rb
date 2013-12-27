@@ -24,6 +24,13 @@ describe ChessHelper do
     it { expect(to_sq("e4")).to eq :e4 }
     it { expect(to_sq(to_idx(:f4))).to eq :f4 }
   end
+  context "to_col" do
+    it { expect(to_col("a")).to eq 0 }
+    it { expect(to_col("b")).to eq 1 }
+    it { expect(to_col(0)).to eq 0 }
+    it { expect(to_col(1)).to eq 1 }
+    it { expect(to_col(8)).to eq 0 }
+  end
 end
 
 describe Position do
@@ -134,14 +141,21 @@ describe Position do
     context "makes legal moves" do
       it {
         position = Position.setup
+        game_count = 0
         File.open("games/Morphy.pgn", "r") do |f|
           while line = f.gets
             next if line.start_with?("[")
             line.gsub(/\b\d+\./,"").split.each do |m|
-              position = position.move(m)
-              puts
-              puts position
-              puts m
+              if m =~ %r"^(1-0|0-1|1/2-1/2)$"
+                position = Position.setup
+                game_count += 1
+              else
+                position = position.move(m)
+                puts
+                puts "Game #{game_count}"
+                puts position
+                puts m
+              end
             end
           end
         end

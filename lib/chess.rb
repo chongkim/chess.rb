@@ -17,6 +17,10 @@ module ChessHelper
     y, x = idx.divmod(8)
     ((x + 'a'.ord).chr + ('8'.ord - y).chr).to_sym
   end
+  def to_col(idx)
+    idx = idx.ord - 'a'.ord if idx.is_a?(String)
+    idx % 8
+  end
 end
 
 class Position
@@ -116,29 +120,62 @@ class Position
   def enpassant_value(piece, source_idx, target_idx)
     (piece.upcase == "P" && 8 < (target_idx-source_idx).abs) ? to_sq(source_idx - white(8,-8)) : nil
   end
-  def move(str)
-    illegal = IllegalMove.new(str,self)
-    position = self.dup
-    if m = str.match(/^(?<piece>[RNBQK])?(?<file>[a-h])?x?(?<sq>[a-h][1-8])\+?$/)
+  def handle_move_piece(str)
+    if m = str.match(/^(?<piece>[RNBQK])?(?<col>[a-h])?x?(?<sq>[a-h][1-8])(=(?<promote>[RNBQ]))?\+?$/)
       target_idx = to_idx(m[:sq])
       piece = (m[:piece] || "P").send(white(:upcase, :downcase))
       list = find(piece, target_idx)
-      raise illegal if list.empty?
-      raise ambiguous if 1 < list.size
+      list.select! { |idx| to_col(idx) == to_col(m[:col]) } if m[:col]
+      raise IllegalMove.new(str,self) if list.empty?
+      raise AmbiguousMove.new(str,self) if 1 < list.size
       source_idx = list[0]
-      position.move_piece(source_idx, target_idx)
-    elsif str == "O-O"
-      piece = "K".send(white(:upcase,:downcase))
-      raise illegal if !castling.include?(white("K","k"))
-      raise illegal if !path_clear(white(:e1,:e8),white(:h1,:h8))
-      position.move_piece(white(:e1,:e8), white(:g1,:g8))
-      position.move_piece(white(:h1,:h8), white(:f1,:f8))
+      move_piece(source_idx, target_idx)
+      raise IllegalMove.new(str,self) if piece.upcase != "P" && m[:promote]
+      self[target_idx] = m[:promote].send(white(:upcase,:downcase)) if piece == "P" && m[:promote]
+      @ep = enpassant_value(piece, source_idx, target_idx)
+      @halfmove += 1 if piece.upcase != "P"
+      true
     else
-      raise illegal
+      false
     end
-    position.ep = enpassant_value(piece, source_idx, target_idx)
+  end
+  def handle_castle(str)
+    if str == "O-O"
+      raise IllegalMove.new(str,self) if !castling.include?(white("K","k"))
+      raise IllegalMove.new(str,self) if !path_clear(white(:e1,:e8),white(:h1,:h8))
+      move_piece(white(:e1,:e8), white(:g1,:g8))
+      move_piece(white(:h1,:h8), white(:f1,:f8))
+      @ep = nil
+      @halfmove += 1
+      true
+    else
+      false
+    end
+  end
+  def handle_long_castle(str)
+    if str == "O-O-O"
+      raise IllegalMove.new(str,self) if !castling.include?(white("K","k"))
+      raise IllegalMove.new(str,self) if !path_clear(white(:e1,:e8),white(:a1,:a8))
+      move_piece(white(:e1,:e8), white(:c1,:c8))
+      move_piece(white(:a1,:a8), white(:d1,:d8))
+      @ep = nil
+      @halfmove += 1
+      true
+    else
+      false
+    end
+  end
+  def move(str)
+    position = self.dup
+
+    result = false
+    result ||= position.handle_move_piece(str)
+    result ||= position.handle_castle(str)
+    result ||= position.handle_long_castle(str)
+
+    raise IllegalMove.new(str,self) if result == false
+
     position.fullmove += 1 if turn == :black
-    position.halfmove += 1 if piece.upcase != "P"
     position.turn = white(:black, :white)
     position
   end
