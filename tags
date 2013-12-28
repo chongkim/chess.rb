@@ -1,0 +1,32 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+AmbiguousMove	lib/chess.rb	/^  class AmbiguousMove < IllegalMove; end$/;"	c	class:Position
+ChessHelper	lib/chess.rb	/^module ChessHelper$/;"	m
+IllegalMove	lib/chess.rb	/^  class IllegalMove < Exception$/;"	c	class:Position
+Position	lib/chess.rb	/^class Position$/;"	c
+[]	lib/chess.rb	/^  def [](idx)$/;"	f	class:Position
+[]	lib/chess.rb	/^  def self.[](str, *args)$/;"	F	class:Position
+[]=	lib/chess.rb	/^  def []=(idx,value)$/;"	f	class:Position
+color	lib/chess.rb	/^  def color(piece)$/;"	f	class:ChessHelper
+enpassant_value	lib/chess.rb	/^  def enpassant_value(piece, source_idx, target_idx)$/;"	f	class:Position
+find	lib/chess.rb	/^  def find(piece, target_sq)$/;"	f	class:Position
+handle_castle	lib/chess.rb	/^  def handle_castle(str)$/;"	f	class:Position
+handle_long_castle	lib/chess.rb	/^  def handle_long_castle(str)$/;"	f	class:Position
+handle_move_piece	lib/chess.rb	/^  def handle_move_piece(str)$/;"	f	class:Position
+initialize	lib/chess.rb	/^    def initialize(str, position)$/;"	f	class:Position.IllegalMove
+initialize	lib/chess.rb	/^  def initialize(opts={})$/;"	f	class:Position
+initialize_copy	lib/chess.rb	/^  def initialize_copy(other)$/;"	f	class:Position
+move	lib/chess.rb	/^  def move(str)$/;"	f	class:Position
+move_piece	lib/chess.rb	/^  def move_piece(source_idx, target_idx)$/;"	f	class:Position
+path_clear	lib/chess.rb	/^  def path_clear(source_idx, target_idx)$/;"	f	class:Position
+setup	lib/chess.rb	/^  def self.setup$/;"	F	class:Position
+to_col	lib/chess.rb	/^  def to_col(idx)$/;"	f	class:ChessHelper
+to_idx	lib/chess.rb	/^  def to_idx(sq)$/;"	f	class:ChessHelper
+to_s	lib/chess.rb	/^  def to_s$/;"	f	class:Position
+to_sq	lib/chess.rb	/^  def to_sq(idx)$/;"	f	class:ChessHelper
+white	lib/chess.rb	/^  def white(w,b)$/;"	f	class:Position
+xydiff	lib/chess.rb	/^  def xydiff(source_idx, target_idx)$/;"	f	class:ChessHelper

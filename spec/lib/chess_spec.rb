@@ -31,6 +31,13 @@ describe ChessHelper do
     it { expect(to_col(1)).to eq 1 }
     it { expect(to_col(8)).to eq 0 }
   end
+  context "to_row" do
+    it { expect(to_row("1")).to eq 7 }
+    it { expect(to_row("2")).to eq 6 }
+    it { expect(to_row(0)).to eq 0 }
+    it { expect(to_row(1)).to eq 0 }
+    it { expect(to_row(8)).to eq 1 }
+  end
 end
 
 describe Position do
@@ -81,6 +88,7 @@ describe Position do
     it { expect(Position["e3"].find("P", :e5)).to eq [] }
     it { expect(Position["e5 .. f5", :ep => :f6].find("P", :f6)).to eq [:e5] }
     it { expect(Position["e4 .. g6"].find("P", :g6)).to eq [] }
+    it { expect(Position["e4 .. g6"].find("p", :g5)).to eq [:g6] }
   end
   context "#dup" do
     let(:position) { Position.new }
@@ -94,6 +102,11 @@ describe Position do
     subject { Position.setup }
     it { expect(subject.board[to_idx(:a1)..to_idx(:h1)]).to eq %w(R N B Q K B N R) }
     its(:turn) { should == :white }
+  end
+  context "#in_check?" do
+    it { expect(Position.setup.in_check?).to be_false }
+    it { expect(Position["Ke4 .. f5"].in_check?).to be_true }
+    it { expect(Position.new.in_check?).to be_false }
   end
   context "#move" do
     context "1. e4" do
@@ -137,6 +150,11 @@ describe Position do
       its(:fullmove) { should == 3 }
       its(:halfmove) { should == 2 }
       its(:ep) { should be_nil }
+    end
+    context "ep passant" do
+      subject { Position["e5 .. f5", :ep => :f6].move("exf6") }
+      it { expect(subject[:f6]).to eq "P" }
+      it { expect(subject[:f5]).to eq "-" }
     end
     context "makes legal moves" do
       it {

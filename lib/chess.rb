@@ -18,8 +18,16 @@ module ChessHelper
     ((x + 'a'.ord).chr + ('8'.ord - y).chr).to_sym
   end
   def to_col(idx)
-    idx = idx.ord - 'a'.ord if idx.is_a?(String)
-    idx % 8
+    idx.is_a?(String) ? idx.ord - 'a'.ord : idx % 8
+  end
+  def to_row(idx)
+    idx.is_a?(String) ? '8'.ord - idx.ord : idx / 8
+  end
+  def white(piece,w,b)
+    case piece
+    when /^[A-Z]$/, :white then w
+    when /^[a-z]$/, :black then b
+    end
   end
 end
 
@@ -65,14 +73,12 @@ class Position
     d = (dx <=> 0) + (dy <=> 0)*8
     (source_idx + d).step(target_idx - d, d).all? { |idx| board[idx] == "-" }
   end
-  def white(w,b)
-    turn == :white ? w : b
-  end
   def find(piece, target_sq)
     target_idx = to_idx(target_sq)
     target_piece = board[target_idx]
     list = INDICES.select do |source_idx|
-      next if board[source_idx] != piece || color(target_piece) == color(piece)
+      source_piece = board[source_idx]
+      next if source_piece != piece || color(target_piece) == color(piece)
       dx, dy = xydiff(source_idx, target_idx)
       case piece.upcase
       when "R" then dx == 0 || dy == 0
@@ -81,10 +87,10 @@ class Position
       when "Q" then dx.abs == dy.abs || dx == 0 || dy == 0
       when "K" then [dx.abs, dy.abs].max <= 1
       when "P" then
-        (dx == 0 && dy == white(-1,1) && target_piece == "-") ||   # move 1 square
-          (dx == 0 && dy == white(-2,2) && source_idx/8 == white(6,1)) ||  # move 2 squares
-          (dx.abs == 1 && dy == white(-1,1) && target_piece != '-' ) || # capture a piece
-          (dx.abs == 1 && dy == white(-1,1) && to_sq(target_sq) == ep) # en passant
+        (dx == 0 && dy == white(piece,-1,1) && target_piece == "-") ||   # move 1 square
+          (dx == 0 && dy == white(piece,-2,2) && source_idx/8 == white(piece,6,1)) ||  # move 2 squares
+          (dx.abs == 1 && dy == white(piece,-1,1) && target_piece != '-' ) || # capture a piece
+          (dx.abs == 1 && dy == white(piece,-1,1) && to_sq(target_sq) == ep) # en passant
       end && path_clear(source_idx, target_idx)
     end
     target_sq.is_a?(Symbol) ? list.map { |idx| to_sq(idx) } : list
@@ -118,20 +124,36 @@ class Position
     @board.each_slice(8).map { |row| row.join(" ") }.join("\n")
   end
   def enpassant_value(piece, source_idx, target_idx)
-    (piece.upcase == "P" && 8 < (target_idx-source_idx).abs) ? to_sq(source_idx - white(8,-8)) : nil
+    (piece.upcase == "P" && 8 < (target_idx-source_idx).abs) ? to_sq(source_idx - white(piece,8,-8)) : nil
+  end
+  def in_check?
+    king_idx = nil
+    INDICES.each { |idx| king_idx = idx if board[idx] == white(turn,"K","k") }
+    king_idx && "RNBQKP".send(white(turn,:downcase, :upcase)).chars.any? { |opponent_piece|
+      !find(opponent_piece, king_idx).empty?
+    }
   end
   def handle_move_piece(str)
-    if m = str.match(/^(?<piece>[RNBQK])?(?<col>[a-h])?x?(?<sq>[a-h][1-8])(=(?<promote>[RNBQ]))?\+?$/)
+    if m = str.match(/^(?<piece>[RNBQK])?(?<col>[a-h])?(?<row>[1-8])?x?(?<sq>[a-h][1-8])(=(?<promote>[RNBQ]))?\+?$/)
       target_idx = to_idx(m[:sq])
-      piece = (m[:piece] || "P").send(white(:upcase, :downcase))
+      piece = (m[:piece] || "P").send(white(turn,:upcase, :downcase))
+
       list = find(piece, target_idx)
       list.select! { |idx| to_col(idx) == to_col(m[:col]) } if m[:col]
+      list.select! { |idx| to_row(idx) == to_row(m[:row]) } if m[:row]
+      list.select! { |idx|
+        tmp = self.dup
+        tmp.move_piece(idx, target_idx)
+        !tmp.in_check?
+      }
+
       raise IllegalMove.new(str,self) if list.empty?
       raise AmbiguousMove.new(str,self) if 1 < list.size
       source_idx = list[0]
       move_piece(source_idx, target_idx)
+      board[to_idx(ep)+white(turn,8,-8)] = "-" if to_sq(target_idx) == ep
       raise IllegalMove.new(str,self) if piece.upcase != "P" && m[:promote]
-      self[target_idx] = m[:promote].send(white(:upcase,:downcase)) if piece == "P" && m[:promote]
+      self[target_idx] = m[:promote].send(white(turn,:upcase,:downcase)) if piece == "P" && m[:promote]
       @ep = enpassant_value(piece, source_idx, target_idx)
       @halfmove += 1 if piece.upcase != "P"
       true
@@ -141,10 +163,10 @@ class Position
   end
   def handle_castle(str)
     if str == "O-O"
-      raise IllegalMove.new(str,self) if !castling.include?(white("K","k"))
-      raise IllegalMove.new(str,self) if !path_clear(white(:e1,:e8),white(:h1,:h8))
-      move_piece(white(:e1,:e8), white(:g1,:g8))
-      move_piece(white(:h1,:h8), white(:f1,:f8))
+      raise IllegalMove.new(str,self) if !castling.include?(white(turn,"K","k"))
+      raise IllegalMove.new(str,self) if !path_clear(white(turn,:e1,:e8),white(turn,:h1,:h8))
+      move_piece(white(turn,:e1,:e8), white(turn,:g1,:g8))
+      move_piece(white(turn,:h1,:h8), white(turn,:f1,:f8))
       @ep = nil
       @halfmove += 1
       true
@@ -154,10 +176,10 @@ class Position
   end
   def handle_long_castle(str)
     if str == "O-O-O"
-      raise IllegalMove.new(str,self) if !castling.include?(white("K","k"))
-      raise IllegalMove.new(str,self) if !path_clear(white(:e1,:e8),white(:a1,:a8))
-      move_piece(white(:e1,:e8), white(:c1,:c8))
-      move_piece(white(:a1,:a8), white(:d1,:d8))
+      raise IllegalMove.new(str,self) if !castling.include?(white(turn,"K","k"))
+      raise IllegalMove.new(str,self) if !path_clear(white(turn,:e1,:e8),white(turn,:a1,:a8))
+      move_piece(white(turn,:e1,:e8), white(turn,:c1,:c8))
+      move_piece(white(turn,:a1,:a8), white(turn,:d1,:d8))
       @ep = nil
       @halfmove += 1
       true
@@ -176,7 +198,7 @@ class Position
     raise IllegalMove.new(str,self) if result == false
 
     position.fullmove += 1 if turn == :black
-    position.turn = white(:black, :white)
+    position.turn = white(turn,:black, :white)
     position
   end
 end
