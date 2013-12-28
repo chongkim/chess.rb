@@ -108,6 +108,10 @@ describe Position do
     it { expect(Position["Ke4 .. f5"].in_check?).to be_true }
     it { expect(Position.new.in_check?).to be_false }
   end
+  context "#attacked?" do
+    it { expect(Position[".. Re4"].attacked?(:e2)).to be_true  }
+    it { expect(Position["Re4"].attacked?(:e2)).to be_false }
+  end
   context "#move" do
     context "1. e4" do
       subject { Position.setup.
@@ -151,10 +155,51 @@ describe Position do
       its(:halfmove) { should == 2 }
       its(:ep) { should be_nil }
     end
-    context "ep passant" do
+    context "en passant" do
       subject { Position["e5 .. f5", :ep => :f6].move("exf6") }
       it { expect(subject[:f6]).to eq "P" }
       it { expect(subject[:f5]).to eq "-" }
+    end
+    context "castling" do
+      subject { Position["Ke1 Rh1"].move("O-O") }
+      its(:castling) { should == %w(Q k q) }
+    end
+    context "game 101" do
+      subject { Position.new(:board => %w(- - - - - - k -
+                                          p - - - - - p -
+                                          - p - - - - K -
+                                          - - p - p P p -
+                                          P - - - P - - -
+                                          - P - P - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -)) }
+      it { expect{subject.move("Kxg5")}.not_to raise_error  }
+    end
+    context "ep with piece" do
+      subject { Position["Qe5 .. f5", :ep => :f6].move("Qf6") }
+      it { expect(subject[:f5]).to eq "p" }
+    end
+    context "can't land on check after castle" do
+      subject { Position.new(:board => %w(- - - - - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -
+                                          - - - - b - - -
+                                          - - - - - - - -
+                                          - - - - K - - R)) }
+      it { expect{subject.move("O-O")}.to raise_error }
+    end
+    context "can't go through check on castle" do
+      subject { Position.new(:board => %w(- - - - - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -
+                                          - - - - - - - -
+                                          - - - b - - - -
+                                          - - - - - - - -
+                                          - - - - K - - R)) }
+      it { expect{subject.move("O-O")}.to raise_error }
     end
     context "makes legal moves" do
       it {

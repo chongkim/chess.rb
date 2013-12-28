@@ -88,7 +88,7 @@ class Position
       when "K" then [dx.abs, dy.abs].max <= 1
       when "P" then
         (dx == 0 && dy == white(piece,-1,1) && target_piece == "-") ||   # move 1 square
-          (dx == 0 && dy == white(piece,-2,2) && source_idx/8 == white(piece,6,1)) ||  # move 2 squares
+          (dx == 0 && dy == white(piece,-2,2) && source_idx/8 == white(piece,6,1)) && target_piece == "-" ||  # move 2 squares
           (dx.abs == 1 && dy == white(piece,-1,1) && target_piece != '-' ) || # capture a piece
           (dx.abs == 1 && dy == white(piece,-1,1) && to_sq(target_sq) == ep) # en passant
       end && path_clear(source_idx, target_idx)
@@ -121,16 +121,21 @@ class Position
   end
   class AmbiguousMove < IllegalMove; end
   def to_s
-    @board.each_slice(8).map { |row| row.join(" ") }.join("\n")
+    b = @board.each_slice(8).map { |row| row.join(" ") }.join("\n")
+    c = castling.empty? ? "-" : castling.join
+    "#{b} #{turn} #{c} #{ep||"-"} #{halfmove} #{fullmove}"
   end
   def enpassant_value(piece, source_idx, target_idx)
-    (piece.upcase == "P" && 8 < (target_idx-source_idx).abs) ? to_sq(source_idx - white(piece,8,-8)) : nil
+    (piece.upcase == "P" && 16 == (target_idx-source_idx).abs) ? to_sq(source_idx - white(piece,8,-8)) : nil
   end
   def in_check?
     king_idx = nil
     INDICES.each { |idx| king_idx = idx if board[idx] == white(turn,"K","k") }
-    king_idx && "RNBQKP".send(white(turn,:downcase, :upcase)).chars.any? { |opponent_piece|
-      !find(opponent_piece, king_idx).empty?
+    king_idx && attacked?(king_idx)
+  end
+  def attacked?(idx)
+    "RNBQKP".send(white(turn,:downcase, :upcase)).chars.any? { |opponent_piece|
+      !find(opponent_piece, idx).empty?
     }
   end
   def handle_move_piece(str)
@@ -151,7 +156,7 @@ class Position
       raise AmbiguousMove.new(str,self) if 1 < list.size
       source_idx = list[0]
       move_piece(source_idx, target_idx)
-      board[to_idx(ep)+white(turn,8,-8)] = "-" if to_sq(target_idx) == ep
+      board[to_idx(ep)+white(turn,8,-8)] = "-" if piece.upcase == "P" && to_sq(target_idx) == ep
       raise IllegalMove.new(str,self) if piece.upcase != "P" && m[:promote]
       self[target_idx] = m[:promote].send(white(turn,:upcase,:downcase)) if piece == "P" && m[:promote]
       @ep = enpassant_value(piece, source_idx, target_idx)
@@ -167,6 +172,8 @@ class Position
       raise IllegalMove.new(str,self) if !path_clear(white(turn,:e1,:e8),white(turn,:h1,:h8))
       move_piece(white(turn,:e1,:e8), white(turn,:g1,:g8))
       move_piece(white(turn,:h1,:h8), white(turn,:f1,:f8))
+      raise IllegalMove.new(str,self) if in_check? || attacked?(white(turn,:f1,:f8))
+      @castling.delete(white(turn,"K","k"))
       @ep = nil
       @halfmove += 1
       true
@@ -180,6 +187,8 @@ class Position
       raise IllegalMove.new(str,self) if !path_clear(white(turn,:e1,:e8),white(turn,:a1,:a8))
       move_piece(white(turn,:e1,:e8), white(turn,:c1,:c8))
       move_piece(white(turn,:a1,:a8), white(turn,:d1,:d8))
+      raise IllegalMove.new(str,self) if in_check?
+      @castling.delete(white(turn,"Q","q"))
       @ep = nil
       @halfmove += 1
       true
