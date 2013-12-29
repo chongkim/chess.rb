@@ -23,6 +23,10 @@ module ChessHelper
     when /^[a-z]$/ then :black
     end
   end
+  def to_col(str)
+    return nil if str.nil?
+    str[0].ord - 'a'.ord
+  end
 end
 
 class Position
@@ -80,12 +84,13 @@ class Position
   def move_pawn(from, to)
     piece = board[from]
     dx, dy = xydiff(from, to)
-    if to == ep &&  dx.abs == 1 && dy == white(piece,-1,1) then
+    if to == ep &&  dx.abs == 1 && dy == white(piece,-1,1) then # en passant
       board[ep + white(piece,8,-8)] = "-"
-    elsif dx == 0 then
+    elsif dx == 0 then # move forward
       return nil if dy.abs != 1 && (dy.abs != 2 || from/8 != white(piece, 6, 1))
       return nil if board[to] != '-'
-    elsif dx.abs == 1 && dy == white(piece,-1,1) && board[to] != '-'
+      return nil if dy != white(piece,-1,1) && dy != white(piece,-2,2)
+    elsif dx.abs == 1 && dy == white(piece,-1,1) && board[to] != '-' then # capture
       true
     else
       return nil
@@ -141,31 +146,55 @@ class Position
       super("#{str}\n#{position}")
     end
   end
+  class AmbiguousMove < Exception
+    def initialize(str, position, list)
+      super("#{str}\n#{position}#{list.map { |idx| to_sq(idx) }.inspect}")
+    end
+  end
   def to_s
-    b = @board.each_slice(8).map { |row| row.join(" ") }.join("\n")
-    t = white(turn,:w,:b)
+    b = @board.map { |p|
+      case p
+      when "P" then "♙"
+      when "p" then "♟"
+      when "R" then "♖"
+      when "r" then "♜"
+      when "N" then "♘"
+      when "n" then "♞"
+      when "B" then "♗"
+      when "b" then "♝"
+      when "Q" then "♕"
+      when "q" then "♛"
+      when "K" then "♔"
+      when "k" then "♚"
+      else p
+      end
+    }.each_slice(8).map { |row| row.join(" ") }.join("\n")
     c = castling.empty? ? "-" : castling.join
     e = ep ? to_sq(ep) : "-"
-    "#{b} #{t} #{c} #{e} #{halfmove} #{fullmove}"
+    "#{b} #{turn} #{c} #{e} #{halfmove} #{fullmove}"
   end
   def move(str)
     position = self.dup
-    if m = str.match(/^( (?<piece>[RNBQK])?
-                        (?<file>[a-h])?
-                        x?
-      (?<sq>[a-h][1-8])
-      \+? )
-      |(?<castle>O-O)
-      $/x) then
-      to = m[:castle] ? white(turn,g1,g8) : eval(m[:sq])
-      piece = m[:castle] ? white(turn, "K", "k") : (m[:piece] || "P").send(white(turn, :upcase, :downcase))
+    if m = str.match(/^ (?<piece>[RNBQK])?  (?<file>[a-h])?  x?  (?<sq>[a-h][1-8])  (=(?<promote>[RNBQ]))?  \+? $
+                       |^(?<castle>O-O)$
+                       |^(?<longcastle>O-O-O)$
+                       /x) then
+      to = m[:longcastle] ? white(turn,c1,c8) : m[:castle] ? white(turn,g1,g8) : eval(m[:sq])
+      piece = m[:castle] || m[:longcastle] ? white(turn, "K", "k") : (m[:piece] || "P").send(white(turn, :upcase, :downcase))
       is_piece_taken = board[to] != '-' || piece.upcase == "P" && to == ep
       raise IllegalMove.new(str,self) if color(piece) != turn
 
-      list = INDICES.select { |from| piece == position.board[from] && move_piece(from, to) }
+      list = INDICES.select { |from|
+        tmp = position.dup
+        piece == tmp.board[from] && tmp.move_piece(from, to)
+      }
+      col = to_col(m[:file])
+      list.select! { |from| from%8 == col } if col
       raise IllegalMove.new(str,self) if list.empty?
       raise AmbiguousMove.new(str,self,list) if 1 < list.size
+
       position.move_piece(list[0], to)
+      position.board[to] = m[:promote] if m[:promote] && piece.upcase == "P"
       position.turn = white(position.turn, :black, :white)
       position.fullmove += 1 if position.turn == :white
       position.halfmove += 1 if piece.upcase != "P" && !is_piece_taken

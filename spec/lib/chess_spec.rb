@@ -30,6 +30,10 @@ describe ChessHelper do
     it { expect(color("r")).to eq :black }
     it { expect(color("-")).to be_nil }
   end
+  context "to_col" do
+    it { expect(to_col("a")).to eq 0 }
+    it { expect(to_col("b")).to eq 1 }
+  end
 end
 
 describe Position do
@@ -80,6 +84,7 @@ describe Position do
     it { expect(Position["e2"].move_piece(e2, e3)).to eq Position["e3"] }
     it { expect(Position["e2"].move_piece(e2, e4)).to eq Position["e4", :ep => e3] }
     it { expect(Position["e2"].move_piece(e2, c3)).to be_nil }
+    it { expect(Position["e4"].move_piece(e4, e3)).to be_nil }
     it { expect(Position["e2 .. e3"].move_piece(e2, e3)).to be_nil }
     it { expect(Position["e2 .. e3"].move_piece(e2, e4)).to be_nil }
     it { expect(Position["e2 .. e4"].move_piece(e2, e4)).to be_nil }
@@ -152,13 +157,20 @@ describe Position do
         game_number = 1
         File.open("games/Morphy.pgn", "r") do |f|
           while line = f.gets
-            next if line.start_with?("[")
-            line.gsub(/\b\d+\./,"").split.each do |m|
-              expect{ position = position.move(m) }.not_to raise_error
-              puts
-              puts "Game #{game_number}"
-              puts position
-              puts m
+            case line
+            when /^\[/ then next
+            when %r"1-0|0-1|1/2-1/2" then
+              game_number += 1
+              position = Position.new
+              next
+            else
+              line.gsub(/\b\d+\./,"").split.each do |m|
+                expect{ position = position.move(m) }.not_to raise_error
+                puts
+                puts "Game #{game_number}"
+                puts position
+                puts m
+              end
             end
           end
         end
