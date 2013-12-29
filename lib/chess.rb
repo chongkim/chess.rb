@@ -27,6 +27,10 @@ module ChessHelper
     return nil if str.nil?
     str[0].ord - 'a'.ord
   end
+  def to_row(str)
+    return nil if str.nil?
+    '8'.ord - str[-1].ord
+  end
 end
 
 class Position
@@ -81,21 +85,25 @@ class Position
     d = (dx <=> 0) + (dy <=> 0)*8
     (from+d).step(to-d, d).all? { |idx| board[idx] == "-" }
   end
+  def in_check?
+    list = INDICES.select { |idx| board[idx]==white(turn,"K","k") }
+    return false if list.empty?
+    king_idx = list[0]
+
+    INDICES.any? { |from| dup.move_piece(from, king_idx) }
+  end
   def move_pawn(from, to)
     piece = board[from]
     dx, dy = xydiff(from, to)
+
     if to == ep &&  dx.abs == 1 && dy == white(piece,-1,1) then # en passant
       board[ep + white(piece,8,-8)] = "-"
-    elsif dx == 0 then # move forward
-      return nil if dy.abs != 1 && (dy.abs != 2 || from/8 != white(piece, 6, 1))
-      return nil if board[to] != '-'
-      return nil if dy != white(piece,-1,1) && dy != white(piece,-2,2)
-    elsif dx.abs == 1 && dy == white(piece,-1,1) && board[to] != '-' then # capture
-      true
+      return true
     else
-      return nil
+      return (board[to] == '-' && dx == 0 && dy == white(piece,-1,1) || # move 1 square
+              board[to] == '-' && dx == 0 && dy == white(piece,-2,2) && from/8 == white(piece, 6, 1) || # move 2 squares
+              board[to] != '-' && dx.abs == 1 && dy == white(piece,-1,1)) # capture
     end
-    return true
   end
   def move_king(from, to)
     piece = board[from]
@@ -106,40 +114,54 @@ class Position
       elsif from == white(piece, e1, e8) && to == white(piece, c1, c8) && castling.include?(white(piece, "Q", "q"))
         move_piece(white(piece, a1, a8), white(piece, d1, d8))
       else
-        return nil
+        return false
       end
     end
     castling.delete(white(piece, "K", "k"))
     castling.delete(white(piece, "Q", "q"))
     return true
   end
-  def move_rook(from,to)
+  def move_rook(from, to)
     piece = board[from]
     dx, dy = xydiff(from, to)
-    return nil if dx != 0 && dy != 0
+
     castling.delete(white(piece, "K", "k")) if from == h1
     castling.delete(white(piece, "Q", "q")) if from == a1
-    return true
+    return dx == 0 || dy == 0
+  end
+  def move_knight(from, to)
+    dx, dy = xydiff(from, to)
+    [dx.abs, dy.abs].sort == [1,2]
+  end
+  def move_bishop(from, to)
+    dx, dy = xydiff(from, to)
+    dx.abs == dy.abs
+  end
+  def move_queen(from , to)
+    dx, dy = xydiff(from, to)
+    dx.abs == dy.abs || dx == 0 || dy == 0
   end
   def move_piece(from, to)
+    return nil if from == to
+
     piece = board[from]
-    dx, dy = xydiff(from, to)
+    _, dy = xydiff(from, to)
 
     return nil if !path_clear(from, to)
     return nil if color(piece) == color(board[to])
 
-    case piece.upcase
-    when "R" then return nil if move_rook(from, to).nil?
-    when "N" then return nil if [dx.abs, dy.abs].sort != [1,2]
-    when "B" then return nil if dx.abs != dy.abs
-    when "Q" then return nil if dx.abs != dy.abs && dx != 0 && dy != 0
-    when "K" then return nil if move_king(from, to).nil?
-    when "P" then return nil if move_pawn(from, to).nil?
-    end
+    is_valid = case piece.upcase
+               when "R" then move_rook(from, to)
+               when "N" then move_knight(from,to)
+               when "B" then move_bishop(from,to)
+               when "Q" then move_queen(from,to)
+               when "K" then move_king(from, to)
+               when "P" then move_pawn(from, to)
+               end
     board[to] = board[from]
     board[from] = "-"
     @ep = piece.upcase == "P" && dy.abs == 2 ? to + white(piece,8,-8) : nil
-    self
+    is_valid && !in_check? ? self : nil
   end
   class IllegalMove < Exception
     def initialize(str, position)
@@ -175,10 +197,10 @@ class Position
   end
   def move(str)
     position = self.dup
-    if m = str.match(/^ (?<piece>[RNBQK])?  (?<file>[a-h])?  x?  (?<sq>[a-h][1-8])  (=(?<promote>[RNBQ]))?  \+? $
-                       |^(?<castle>O-O)$
-                       |^(?<longcastle>O-O-O)$
-                       /x) then
+    if m = str.match(/^(?<piece>[RNBQK])?  (?<file>[a-h])?(?<rank>[1-8])?  x?  (?<sq>[a-h][1-8])  (=(?<promote>[RNBQ]))?  \+? $
+                     |^(?<castle>O-O)$
+                     |^(?<longcastle>O-O-O)$
+                     /x) then
       to = m[:longcastle] ? white(turn,c1,c8) : m[:castle] ? white(turn,g1,g8) : eval(m[:sq])
       piece = m[:castle] || m[:longcastle] ? white(turn, "K", "k") : (m[:piece] || "P").send(white(turn, :upcase, :downcase))
       is_piece_taken = board[to] != '-' || piece.upcase == "P" && to == ep
@@ -189,12 +211,14 @@ class Position
         piece == tmp.board[from] && tmp.move_piece(from, to)
       }
       col = to_col(m[:file])
+      row = to_row(m[:rank])
       list.select! { |from| from%8 == col } if col
+      list.select! { |from| from/8 == row } if row
       raise IllegalMove.new(str,self) if list.empty?
       raise AmbiguousMove.new(str,self,list) if 1 < list.size
 
       position.move_piece(list[0], to)
-      position.board[to] = m[:promote] if m[:promote] && piece.upcase == "P"
+      position.board[to] = m[:promote].send(white(piece,:upcase,:downcase)) if m[:promote] && piece.upcase == "P"
       position.turn = white(position.turn, :black, :white)
       position.fullmove += 1 if position.turn == :white
       position.halfmove += 1 if piece.upcase != "P" && !is_piece_taken

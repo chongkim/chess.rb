@@ -34,6 +34,10 @@ describe ChessHelper do
     it { expect(to_col("a")).to eq 0 }
     it { expect(to_col("b")).to eq 1 }
   end
+  context "to_row" do
+    it { expect(to_row("1")).to eq 7 }
+    it { expect(to_row("8")).to eq 0 }
+  end
 end
 
 describe Position do
@@ -64,7 +68,15 @@ describe Position do
     it { expect(Position["Re4 e3"].path_clear(e4, e2)).to be_false }
     it { expect(Position["Ne4 d3 d4 d5"].path_clear(e4, c3)).to be_true }
   end
+  context "in_check?" do
+    it { expect(Position["Ke4 .. Re8"].in_check?).to be_true }
+    it { expect(Position["Ke4 .. Nc3"].in_check?).to be_true }
+    it { expect(Position["Re8 .. Ke4", :turn => :black].in_check?).to be_true }
+    it { expect(Position["Nc3 .. Ke4", :turn => :black].in_check?).to be_true }
+    it { expect(Position.new.in_check?).to be_false }
+  end
   context "#move_piece" do
+    it { expect(Position["Ke1"].move_piece(e1,e1)).to be_nil }
     it { expect(Position["Ke1 Rh1"].move_piece(e1, g1)).to eq Position["Kg1 Rf1", :castling => %w(k q)] }
     it { expect(Position["Ke1 Ra1"].move_piece(e1, c1)).to eq Position["Kc1 Rd1", :castling => %w(k q)] }
     it { expect(Position["Ke1 Rh1"].move_piece(e1, e2)).to eq Position["Ke2 Rh1", :castling => %w(k q)] }
@@ -90,6 +102,8 @@ describe Position do
     it { expect(Position["e2 .. e4"].move_piece(e2, e4)).to be_nil }
     it { expect(Position["e2 .. d3"].move_piece(e2, d3)).to eq Position["d3"] }
     it { expect(Position["Re4 Be3"].move_piece(e4, e3)).to be_nil  }
+    it { expect(Position["Ke4 .. Rf8"].move_piece(e4, f4)).to be_nil }
+    it { expect(Position["Kf4 a2 .. Rf8"].move_piece(a2, a3)).to be_nil }
   end
   context "#dup" do
     subject { Position.new }
