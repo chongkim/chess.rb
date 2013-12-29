@@ -4,225 +4,86 @@ require "debugger"
 include ChessHelper
 
 describe ChessHelper do
-  context "to_idx" do
-    it { expect(to_idx(0)).to eq 0 }
-    it { expect(to_idx(:a8)).to eq 0 }
-    it { expect(to_idx(:h8)).to eq 7 }
-    it { expect(to_idx(:h1)).to eq 63 }
+  context "coordinates" do
+    it { expect(a8).to eq 0 }
+    it { expect(b8).to eq 1 }
+    it { expect(a7).to eq 8 }
   end
-  context "color" do
-    it { expect(color("P")).to eq :white }
-    it { expect(color("p")).to eq :black }
-    it { expect(color("-")).to be_nil }
-  end
-  context "xydiff" do
-    it { expect(xydiff(0,1)).to eq [1,0] }
-    it { expect(xydiff(0,8)).to eq [0,1] }
+  context "white" do
+    it { expect(white(:white,1,0)).to eq 1 }
+    it { expect(white(:black,1,0)).to eq 0 }
+    it { expect(white(nil,1,0)).to be_nil }
+    it { expect(white("R",1,0)).to eq 1 }
+    it { expect(white("r",1,0)).to eq 0 }
+    it { expect(white("-",1,0)).to be_nil }
   end
   context "to_sq" do
-    it { expect(to_sq(:e4)).to eq :e4 }
-    it { expect(to_sq("e4")).to eq :e4 }
-    it { expect(to_sq(to_idx(:f4))).to eq :f4 }
+    it { expect(to_sq(0)).to eq :a8 }
+    it { expect(to_sq(1)).to eq :b8 }
+    it { expect(to_sq(8)).to eq :a7 }
   end
-  context "to_col" do
-    it { expect(to_col("a")).to eq 0 }
-    it { expect(to_col("b")).to eq 1 }
-    it { expect(to_col(0)).to eq 0 }
-    it { expect(to_col(1)).to eq 1 }
-    it { expect(to_col(8)).to eq 0 }
+  context "xydiff" do
+    it { expect(xydiff(e1, g2)).to eq [2, -1] }
   end
-  context "to_row" do
-    it { expect(to_row("1")).to eq 7 }
-    it { expect(to_row("2")).to eq 6 }
-    it { expect(to_row(0)).to eq 0 }
-    it { expect(to_row(1)).to eq 0 }
-    it { expect(to_row(8)).to eq 1 }
+  context "color" do
+    it { expect(color("R")).to eq :white }
+    it { expect(color("r")).to eq :black }
+    it { expect(color("-")).to be_nil }
   end
 end
 
 describe Position do
-  its(:board) { should == %w(-)*64 }
+  its(:board) { should == %w(r n b q k b n r
+                             p p p p p p p p
+                             - - - - - - - -
+                             - - - - - - - -
+                             - - - - - - - -
+                             - - - - - - - -
+                             P P P P P P P P
+                             R N B Q K B N R) }
   its(:turn) { should == :white }
-  its(:ep) { should be_nil }
   its(:castling) { should == %w(K Q k q) }
+  its(:ep) { should be_nil }
   its(:halfmove) { should == 0 }
   its(:fullmove) { should == 1 }
-  context ".new(args)" do
-    it { expect(Position.new(:black).turn).to eq :black }
-    it { expect(Position.new(:turn => :black).turn).to eq :black }
-  end
-  context ".[]" do
-    subject { Position["Re4 .. Be1 e2", :black] }
-    it { expect(subject[:e4]).to eq "R" }
-    it { expect(subject[:e1]).to eq "b" }
-    it { expect(subject[:e2]).to eq "p" }
+  context ".new(opts)" do
+    subject { Position.new(:turn => :black) }
     its(:turn) { should == :black }
   end
+  context ".[]" do
+    it { expect(Position["Re4"].board[e4]).to eq "R" }
+    it { expect(Position["Re4", :turn => :black].turn).to eq :black }
+  end
   context "path_clear" do
-    it { expect(Position["Re4"].path_clear(to_idx(:e4), to_idx(:e2))).to be_true  }
-    it { expect(Position["Re4 e3"].path_clear(to_idx(:e4), to_idx(:e2))).to be_false  }
-    it { expect(Position["Re4 e2"].path_clear(to_idx(:e4), to_idx(:e2))).to be_true  }
+    it { expect(Position["Re4"].path_clear(e4, e2)).to be_true }
+    it { expect(Position["Re4 Re2"].path_clear(e4, e2)).to be_true }
+    it { expect(Position["Re4 e3"].path_clear(e4, e2)).to be_false }
+    it { expect(Position["Ne4 d3 d4 d5"].path_clear(e4, c3)).to be_true }
   end
-  context "#find" do
-    it { expect(Position["Re4"].find("R", :e2)).to eq [:e4] }
-    it { expect(Position["Re4 e2"].find("R", :e2)).to eq [] }
-    it { expect(Position["Re4 e3"].find("R", :e2)).to eq [] }
-    it { expect(Position["Re4 Re1"].find("R", :e2)).to eq [:e4, :e1] }
-    it { expect(Position["Re4 Rd1"].find("R", :e2)).to eq [:e4] }
-    it { expect(Position["Re4 .. e2"].find("R", :e2)).to eq [:e4] }
-    it { expect(Position["Ne4"].find("N", :c3)).to eq [:e4] }
-    it { expect(Position["Ne4"].find("N", :e2)).to eq [] }
-    it { expect(Position["Ne4 d3 d4 d5"].find("N", :c3)).to eq [:e4] }
-    it { expect(Position[".. Be4", :black].find("b", :f3)).to eq [:e4] }
-    it { expect(Position[".. Be4", :black].find("b", :f4)).to eq [] }
-    it { expect(Position["Qe4"].find("Q", :e2)).to eq [:e4] }
-    it { expect(Position["Qe4"].find("Q", :a8)).to eq [:e4] }
-    it { expect(Position["Qe4"].find("Q", :c3)).to eq [] }
-    it { expect(Position["Ke4"].find("K", :e3)).to eq [:e4] }
-    it { expect(Position["Ke3"].find("K", :e5)).to eq [] }
-    it { expect(Position["e2"].find("P", :e3)).to eq [:e2] }
-    it { expect(Position["e2"].find("P", :e4)).to eq [:e2] }
-    it { expect(Position["e2"].find("P", :e5)).to eq [] }
-    it { expect(Position["e2 .. e3"].find("P", :e3)).to eq [] }
-    it { expect(Position["e2 .. f3"].find("P", :f3)).to eq [:e2] }
-    it { expect(Position["e3"].find("P", :e5)).to eq [] }
-    it { expect(Position["e5 .. f5", :ep => :f6].find("P", :f6)).to eq [:e5] }
-    it { expect(Position["e4 .. g6"].find("P", :g6)).to eq [] }
-    it { expect(Position["e4 .. g6"].find("p", :g5)).to eq [:g6] }
-  end
-  context "#dup" do
-    let(:position) { Position.new }
-    subject { position.dup }
-    it {
-      subject[:e4] = "R"
-      expect(position[:e4]).to eq "-"
-    }
-  end
-  context ".setup" do
-    subject { Position.setup }
-    it { expect(subject.board[to_idx(:a1)..to_idx(:h1)]).to eq %w(R N B Q K B N R) }
-    its(:turn) { should == :white }
-  end
-  context "#in_check?" do
-    it { expect(Position.setup.in_check?).to be_false }
-    it { expect(Position["Ke4 .. f5"].in_check?).to be_true }
-    it { expect(Position.new.in_check?).to be_false }
-  end
-  context "#attacked?" do
-    it { expect(Position[".. Re4"].attacked?(:e2)).to be_true  }
-    it { expect(Position["Re4"].attacked?(:e2)).to be_false }
-  end
-  context "#move" do
-    context "1. e4" do
-      subject { Position.setup.
-                move("e4") }
-      its(:turn) { should == :black }
-      it { expect(subject[:e4]).to eq "P" }
-      it { expect(subject[:e2]).to eq "-" }
-      its(:fullmove) { should == 1 }
-      its(:halfmove) { should == 0 }
-      its(:ep) { should == :e3 }
-    end
-    context "1. e4 e5" do
-      subject { Position.setup.
-                move("e4").move("e5") }
-      its(:turn) { should == :white }
-      it { expect(subject[:e5]).to eq "p" }
-      it { expect(subject[:e7]).to eq "-" }
-      its(:fullmove) { should == 2 }
-      its(:halfmove) { should == 0 }
-      its(:ep) { should == :e6 }
-    end
-    context "1. e4 e5 2. Nf3" do
-      subject { Position.setup.
-                move("e4").move("e5").
-                move("Nf3") }
-      its(:turn) { should == :black }
-      it { expect(subject[:f3]).to eq "N" }
-      it { expect(subject[:g1]).to eq "-" }
-      its(:fullmove) { should == 2 }
-      its(:halfmove) { should == 1 }
-      its(:ep) { should be_nil }
-    end
-    context "1. e4 e5 2. Nf3" do
-      subject { Position.setup.
-                move("e4").move("e5").
-                move("Nf3").move("Nc6") }
-      its(:turn) { should == :white }
-      it { expect(subject[:c6]).to eq "n" }
-      it { expect(subject[:b8]).to eq "-" }
-      its(:fullmove) { should == 3 }
-      its(:halfmove) { should == 2 }
-      its(:ep) { should be_nil }
-    end
-    context "en passant" do
-      subject { Position["e5 .. f5", :ep => :f6].move("exf6") }
-      it { expect(subject[:f6]).to eq "P" }
-      it { expect(subject[:f5]).to eq "-" }
-    end
-    context "castling" do
-      subject { Position["Ke1 Rh1"].move("O-O") }
-      its(:castling) { should == %w(Q k q) }
-    end
-    context "game 101" do
-      subject { Position.new(:board => %w(- - - - - - k -
-                                          p - - - - - p -
-                                          - p - - - - K -
-                                          - - p - p P p -
-                                          P - - - P - - -
-                                          - P - P - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -)) }
-      it { expect{subject.move("Kxg5")}.not_to raise_error  }
-    end
-    context "ep with piece" do
-      subject { Position["Qe5 .. f5", :ep => :f6].move("Qf6") }
-      it { expect(subject[:f5]).to eq "p" }
-    end
-    context "can't land on check after castle" do
-      subject { Position.new(:board => %w(- - - - - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -
-                                          - - - - b - - -
-                                          - - - - - - - -
-                                          - - - - K - - R)) }
-      it { expect{subject.move("O-O")}.to raise_error }
-    end
-    context "can't go through check on castle" do
-      subject { Position.new(:board => %w(- - - - - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -
-                                          - - - - - - - -
-                                          - - - b - - - -
-                                          - - - - - - - -
-                                          - - - - K - - R)) }
-      it { expect{subject.move("O-O")}.to raise_error }
-    end
-    context "makes legal moves" do
-      it {
-        position = Position.setup
-        game_count = 0
-        File.open("games/Morphy.pgn", "r") do |f|
-          while line = f.gets
-            next if line.start_with?("[")
-            line.gsub(/\b\d+\./,"").split.each do |m|
-              if m =~ %r"^(1-0|0-1|1/2-1/2)$"
-                position = Position.setup
-                game_count += 1
-              else
-                position = position.move(m)
-                puts
-                puts "Game #{game_count}"
-                puts position
-                puts m
-              end
-            end
-          end
-        end
-      }
-    end
+  context "#move_piece" do
+    it { expect(Position["Ke1 Rh1"].move_piece(e1, g1)).to eq Position["Kg1 Rf1", :castling => %w(k q)] }
+    it { expect(Position["Ke1 Ra1"].move_piece(e1, c1)).to eq Position["Kc1 Rd1", :castling => %w(k q)] }
+    it { expect(Position["Ke1 Rh1"].move_piece(e1, e2)).to eq Position["Ke2 Rh1", :castling => %w(k q)] }
+    it { expect(Position["Ke1 Rh1 Ra1"].move_piece(h1, h2)).to eq Position["Ke1 Rh2 Ra1", :castling => %w(Q k q)] }
+    it { expect(Position["Ke1 Rh1 Ra1"].move_piece(a1, a2)).to eq Position["Ke1 Rh1 Ra2", :castling => %w(K k q)] }
+    it { expect(Position["e5 .. f5", :ep => f6].move_piece(e5, f6)).to eq Position["f6"] }
+    it { expect(Position["Re4"].move_piece(e4, e2)).to eq Position["Re2"] }
+    it { expect(Position["Re4"].move_piece(e4, d3)).to be_nil }
+    it { expect(Position["Ne4"].move_piece(e4, c3)).to eq Position["Nc3"] }
+    it { expect(Position["Ne4"].move_piece(e4, c2)).to be_nil }
+    it { expect(Position[".. Be4"].move_piece(e4, f5)).to eq Position[".. Bf5"] }
+    it { expect(Position[".. Be4"].move_piece(e4, e2)).to be_nil }
+    it { expect(Position["Qe4"].move_piece(e4, e2)).to eq Position["Qe2"] }
+    it { expect(Position["Qe4"].move_piece(e4, d2)).to be_nil }
+    it { expect(Position["Ke4"].move_piece(e4, e3)).to eq Position["Ke3", :castling => %w(k q)] }
+    it { expect(Position["Ke4"].move_piece(e4, e2)).to be_nil }
+    it { expect(Position["e2"].move_piece(e2, e3)).to eq Position["e3"] }
+    it { expect(Position["e2"].move_piece(e2, e4)).to eq Position["e4", :ep => e3] }
+    it { expect(Position["e2"].move_piece(e2, c3)).to be_nil }
+    it { expect(Position["e2 .. e3"].move_piece(e2, e3)).to be_nil }
+    it { expect(Position["e2 .. e3"].move_piece(e2, e4)).to be_nil }
+    it { expect(Position["e2 .. e4"].move_piece(e2, e4)).to be_nil }
+    it { expect(Position["e2 .. d3"].move_piece(e2, d3)).to eq Position["d3"] }
+    it { expect(Position["Re4 Be3"].move_piece(e4, e3)).to be_nil  }
   end
 end
