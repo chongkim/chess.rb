@@ -86,4 +86,83 @@ describe Position do
     it { expect(Position["e2 .. d3"].move_piece(e2, d3)).to eq Position["d3"] }
     it { expect(Position["Re4 Be3"].move_piece(e4, e3)).to be_nil  }
   end
+  context "#dup" do
+    subject { Position.new }
+    let(:position) { subject.dup }
+    before(:each) { position.board[e4] = "R" }
+    it { expect(subject.board[e4]).to eq "-" }
+  end
+  context "#move" do
+    context "1. e4" do
+      subject { Position.new.move("e4") }
+      it { expect(subject).to eq Position.new(:board => %w(r n b q k b n r
+                                                           p p p p p p p p
+                                                           - - - - - - - -
+                                                           - - - - - - - -
+                                                           - - - - P - - -
+                                                           - - - - - - - -
+                                                           P P P P - P P P
+                                                           R N B Q K B N R),
+      :turn => :black, :ep => e3, :castling => %w(K Q k q), :halfmove => 0, :fullmove => 1) }
+    end
+    context "1. e4 e5" do
+      subject { Position.new.
+                move("e4").move("e5") }
+      it { expect(subject).to eq Position.new(:board => %w(r n b q k b n r
+                                                           p p p p - p p p
+                                                           - - - - - - - -
+                                                           - - - - p - - -
+                                                           - - - - P - - -
+                                                           - - - - - - - -
+                                                           P P P P - P P P
+                                                           R N B Q K B N R),
+      :turn => :white, :ep => e6, :castling => %w(K Q k q), :halfmove => 0, :fullmove => 2) }
+    end
+    context "1. e4 e5 2. Nf3" do
+      subject { Position.new.
+                move("e4").move("e5").
+                move("Nf3") }
+      it { expect(subject).to eq Position.new(:board => %w(r n b q k b n r
+                                                           p p p p - p p p
+                                                           - - - - - - - -
+                                                           - - - - p - - -
+                                                           - - - - P - - -
+                                                           - - - - - N - -
+                                                           P P P P - P P P
+                                                           R N B Q K B - R),
+      :turn => :black, :ep => nil, :castling => %w(K Q k q), :halfmove => 1, :fullmove => 2) }
+    end
+    context "1. e4 e5 2. Nf3 Nc6" do
+      subject { Position.new.
+                move("e4").move("e5").
+                move("Nf3").move("Nc6") }
+      it { expect(subject).to eq Position.new(:board => %w(r - b q k b n r
+                                                           p p p p - p p p
+                                                           - - n - - - - -
+                                                           - - - - p - - -
+                                                           - - - - P - - -
+                                                           - - - - - N - -
+                                                           P P P P - P P P
+                                                           R N B Q K B - R),
+      :turn => :white, :ep => nil, :castling => %w(K Q k q), :halfmove => 2, :fullmove => 3) }
+    end
+    context "legal moves from pgn file" do
+      it {
+        position = Position.new
+        game_number = 1
+        File.open("games/Morphy.pgn", "r") do |f|
+          while line = f.gets
+            next if line.start_with?("[")
+            line.gsub(/\b\d+\./,"").split.each do |m|
+              expect{ position = position.move(m) }.not_to raise_error
+              puts
+              puts "Game #{game_number}"
+              puts position
+              puts m
+            end
+          end
+        end
+      }
+    end
+  end
 end

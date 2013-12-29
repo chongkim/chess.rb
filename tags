@@ -6,13 +6,21 @@
 !_TAG_PROGRAM_VERSION	5.8	//
 ==	lib/chess.rb	/^  def ==(other)$/;"	f	class:Position
 ChessHelper	lib/chess.rb	/^module ChessHelper$/;"	m
+IllegalMove	lib/chess.rb	/^  class IllegalMove < Exception$/;"	c	class:Position
 Position	lib/chess.rb	/^class Position$/;"	c
 []	lib/chess.rb	/^  def self.[](str,opts={})$/;"	F	class:Position
 color	lib/chess.rb	/^  def color(piece)$/;"	f	class:ChessHelper
+initialize	lib/chess.rb	/^    def initialize(str, position)$/;"	f	class:Position.IllegalMove
 initialize	lib/chess.rb	/^  def initialize(opts={})$/;"	f	class:Position
+initialize_copy	lib/chess.rb	/^  def initialize_copy(other)$/;"	f	class:Position
 inspect	lib/chess.rb	/^  def inspect$/;"	f	class:Position
+move	lib/chess.rb	/^  def move(str)$/;"	f	class:Position
+move_king	lib/chess.rb	/^  def move_king(from, to)$/;"	f	class:Position
+move_pawn	lib/chess.rb	/^  def move_pawn(from, to)$/;"	f	class:Position
 move_piece	lib/chess.rb	/^  def move_piece(from, to)$/;"	f	class:Position
+move_rook	lib/chess.rb	/^  def move_rook(from,to)$/;"	f	class:Position
 path_clear	lib/chess.rb	/^  def path_clear(from, to)$/;"	f	class:Position
+to_s	lib/chess.rb	/^  def to_s$/;"	f	class:Position
 to_sq	lib/chess.rb	/^  def to_sq(idx)$/;"	f	class:ChessHelper
 white	lib/chess.rb	/^  def white(piece,w,b)$/;"	f	class:ChessHelper
 xydiff	lib/chess.rb	/^  def xydiff(from, to)$/;"	f	class:ChessHelper
