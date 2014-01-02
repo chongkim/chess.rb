@@ -38,10 +38,10 @@ end
 
 describe Position do
   context ".new" do
-    its(:e4) { should == :- }
-    its(:e2) { should == :P }
-    its(:d1) { should == :Q }
-    its(:d8) { should == :q }
+    it { expect(subject[e4]).to eq :- }
+    it { expect(subject[e2]).to eq :P }
+    it { expect(subject[d1]).to eq :Q }
+    it { expect(subject[d8]).to eq :q }
     its(:turn) { should == :white }
     its(:castling) { should == [:K, :Q, :k, :q] }
     its(:ep) { should == nil }
@@ -50,8 +50,8 @@ describe Position do
   end
   context ".[]" do
     subject { Position[R: e4, :turn => :black] }
-    its(:e4) { should == :R }
-    its(:e2) { should == :- }
+    it { expect(subject[e4]).to eq :R }
+    it { expect(subject[e2]).to eq :- }
     its(:turn) { should == :black }
   end
   context "#==" do
@@ -61,6 +61,19 @@ describe Position do
     it { expect(subject.path_clear(e2,e7)).to eq true }
     it { expect(subject.path_clear(e2,b2)).to eq false }
   end
+  context "#dup" do
+    it {
+      position = subject.dup
+      subject[e4] = :R
+      expect(position[e4]).to eq :-
+    }
+    it {
+      position = subject.dup
+      subject.move_piece(e2,e4)
+      expect(position[e4]).to eq :-
+    }
+  end
+
   context "#move_piece" do
     it { expect(Position[R: e4].move_piece(e4,e2)).to eq Position[R: e2] }
     it { expect(Position[R: e4].move_piece(e4,d3)).to eq nil }
@@ -83,5 +96,84 @@ describe Position do
     it { expect(Position[P: e2].move_piece(e2,d3)).to eq nil }
     it { expect(Position[P: e2, r:d3].move_piece(e2,d3)).to eq Position[P: d3] }
     it { expect(Position[P: e5, p:f5, :ep => f6].move_piece(e5,f6)).to eq Position[P: f6] }
+  end
+
+  context "#attacked" do
+    it { expect(Position.new.attacked(e1,:black)).to eq false }
+    it { expect(Position[K: e4, r: e1].attacked(e4, :black)).to eq true }
+  end
+  context "#move" do
+    context "e4" do
+      subject { Position.new.move("e4") }
+      it { expect(subject[e4]).to eq :P }
+      it { expect(subject[e2]).to eq :- }
+      its(:turn) { should == :black }
+      its(:castling) { should == [:K, :Q, :k, :q] }
+      its(:ep) { should == e3 }
+      its(:halfmove) { should == 0 }
+      its(:fullmove) { should == 1 }
+    end
+    context "e4 e5" do
+      subject { Position.new.move("e4").move("e5") }
+      it { expect(subject[e5]).to eq :p }
+      it { expect(subject[e7]).to eq :- }
+      its(:turn) { should == :white }
+      its(:castling) { should == [:K, :Q, :k, :q] }
+      its(:ep) { should == e6 }
+      its(:halfmove) { should == 0 }
+      its(:fullmove) { should == 2 }
+    end
+    context "e4 e5 Nf3" do
+      subject { Position.new.move("e4").move("e5").move("Nf3") }
+      it { expect(subject[f3]).to eq :N }
+      it { expect(subject[g1]).to eq :- }
+      its(:turn) { should == :black }
+      its(:castling) { should == [:K, :Q, :k, :q] }
+      its(:ep) { should == nil }
+      its(:halfmove) { should == 1 }
+      its(:fullmove) { should == 2 }
+    end
+    context "e4 e5 Nf3 Nf6" do
+      subject { Position.new.move("e4").move("e5").move("Nf3").move("Nf6") }
+      it { expect(subject[f6]).to eq :n }
+      it { expect(subject[g8]).to eq :- }
+      its(:turn) { should == :white }
+      its(:castling) { should == [:K, :Q, :k, :q] }
+      its(:ep) { should == nil }
+      its(:halfmove) { should == 2 }
+      its(:fullmove) { should == 3 }
+    end
+    context "e4 e5 Nf3 Nf6 Nxe5" do
+      subject { Position.new.move("e4").move("e5").move("Nf3").move("Nf6").move("Nxe5") }
+      it { expect(subject[e5]).to eq :N }
+      it { expect(subject[f3]).to eq :- }
+      its(:turn) { should == :black }
+      its(:castling) { should == [:K, :Q, :k, :q] }
+      its(:ep) { should == nil }
+      its(:halfmove) { should == 0 }
+      its(:fullmove) { should == 3 }
+    end
+  end
+  context "reads from pgn file" do
+    it {
+      File.open("games/Morphy.pgn", "r") do |f|
+        position = Position.new
+        game = 1
+        while line = f.gets
+          next if line.start_with?("[")
+          line.gsub(/\b\d+\./,"").split.each do |m|
+            case m
+            when %r"^1-0$|^0-1$|^1/2-1/2$|\*"
+              position = Position.new
+              game += 1
+            else
+              position.move(m)
+              puts
+              puts "Game #{game}", position, m
+            end
+          end
+        end
+      end
+    }
   end
 end
