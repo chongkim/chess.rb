@@ -25,6 +25,7 @@ module ChessHelper
 end
 
 class Symbol
+  include ChessHelper
   def valid_move(from, to)
     dx, dy = xydiff(from, to)
     case self
@@ -77,8 +78,8 @@ class Position
   def initialize(opts={})
     if opts.any? { |k,v| k.size == 1 }
       @board = [:-]*64
-      @pieces = Hash[%w(r n b q k p R N B Q K P).map { |c| [c.to_sym, Set[]] }]
-      @pieces[:-] = Set[*0..63]
+      @pieces = Hash[%w(r n b q k p R N B Q K P).map { |c| [c.to_sym, []] }]
+      @pieces[:-] = [*0..63]
       opts.each do |p,v|
         next if p.size != 1
         v = [v] unless Array === v
@@ -96,8 +97,8 @@ class Position
                   - - - - - - - -
                   P P P P P P P P
                   R N B Q K B N R).map(&:to_sym).each.with_index do |p,idx|
-                    @pieces[p] ||= Set[]
-                    @pieces[p].add(idx)
+                    @pieces[p] ||= []
+                    @pieces[p].push(idx)
                   end
     end
     @turn = opts[:turn] || :white
@@ -108,7 +109,7 @@ class Position
   end
   def initialize_copy(other)
     @board = other._board.dup
-    @pieces = other._pieces.dup
+    @pieces = Hash[other._pieces.map { |k,v| [k,v.dup] }]
     @turn = other.turn
     @castling = other.castling.dup
     @ep = other.ep
@@ -119,10 +120,8 @@ class Position
     Position.new(opts)
   end
   def []=(idx,p)
-    @pieces[@board[idx]] ||= Set[]
     @pieces[@board[idx]].delete(idx)
-    @pieces[p] ||= Set[]
-    @pieces[p].add(idx)
+    @pieces[p].push(idx)
     @board[idx] = p
   end
   def inspect
@@ -135,8 +134,10 @@ class Position
   def _board; @board; end
   def _pieces; @pieces; end
   def ==(other)
-    (self.class == other.class &&
-     @board == other._board &&
+    return false if self.class != other.class
+    @pieces.each { |k,v| v.sort! }
+    other._pieces.each { |k,v| v.sort! }
+    (@board == other._board &&
      @pieces == other._pieces &&
      @turn == other.turn &&
      @castling == other.castling &&
@@ -159,6 +160,10 @@ class Position
     return nil if piece.color == target.color
     is_ep_capture = piece.pawn? && to == ep
     is_capture = target != :- || is_ep_capture
+    if piece.king? && (to - from).abs == 2 then
+      return nil if to == white(turn,g1,g8) && !castling.include?(white(turn,:K,:k))
+      return nil if to == white(turn,c1,c8) && !castling.include?(white(turn,:Q,:q))
+    end
     if (!is_capture && piece.valid_move(from, to) ||
         is_capture && piece.valid_capture(from, to)) && path_clear(from, to) then
       @ep = piece.pawn? && (to - from).abs == 16 ? (to+from)/2 : nil if act
@@ -180,13 +185,17 @@ class Position
     }.each_slice(8).map { |row| row.join(" ") }.join("\n")
     c = castling.empty? ? :- : castling.join
     e = ep.nil? ? :- : ep.to_sq
-    "#{b} #{turn} #{c} #{e} #{halfmove} #{fullmove} #{@pieces[:n].map(&:to_sq).inspect}"
+    "#{b} #{turn} #{c} #{e} #{halfmove} #{fullmove}"
   end
-  def attacked(to, color)
-    opponents = [:R, :N, :B, :Q, :K, :P]
-    opponents = opponents.map(&:downcase) if color == :black
-    opponents.any? { |opponent|
-      @pieces[opponent].any? { |from| opponent.valid_capture(from, to) && path_clear(from, to) }
+  def piece_list(color)
+    results = [:R, :N, :B, :Q, :K, :P]
+    results.map!(&:downcase) if color == :black
+    results
+  end
+  def in_check?
+    king_idx = @pieces[white(turn,:K,:k)].first
+    piece_list(white(turn,:black,:white)).any? { |opponent|
+      @pieces[opponent].any? { |from| opponent.valid_capture(from, king_idx) && path_clear(from, king_idx) }
     }
   end
   def move(str)
@@ -196,26 +205,21 @@ class Position
       to = m[:sq].to_idx
       piece = (m[:piece] || "P").to_sym
       piece = piece.downcase if turn == :black
-      list = @pieces[piece].to_a
+      list = @pieces[piece].dup
       list.select! { |from| from%8 == m[:col].ord - 'a'.ord } if m[:col]
       list.select! { |from| from/8 == '8'.ord - m[:row].ord } if m[:row]
-      list.select! { |from| move_piece(from, to, false) }
-      list.select! { |from|
-        king_list = @pieces[white(turn,:K,:k)].to_a
-        if !king_list.empty? then
-          king_idx = piece.king? ? to : king_list[0]
-          tmp = self.dup
-          tmp.move_piece(from, to)
-          !tmp.attacked(king_idx,white(turn,:black,:white))
-        else
-          false
-        end
-      }
+      list.select! { |from| (tmp = dup.move_piece(from, to)) && !tmp.in_check? }
       promote = m[:promote].send(white(turn,:upcase,:downcase)).to_sym if m[:promote]
     elsif str =~ /^O-O(-O)?$/
+      debugger
       piece = white(turn, :K, :k)
       list = [white(turn, e1, e8)]
       to = str == "O-O" ?  white(turn, g1, g8) : white(turn, c1, c8)
+    elsif str =~ /([a-h][1-8])-([a-h][1-8])/
+      from = $1.to_idx
+      list = [from]
+      piece = self[from]
+      to = $2.to_idx
     end
     raise IllegalMove.new(str, self) if list.empty?
     raise AmbiguousMove.new(str, self, list) if 1 < list.size
@@ -230,5 +234,9 @@ class Position
     @turn = white(turn, :black, :white)
     @fullmove += 1 if turn == :white
     self
+  end
+  def possible_moves(from=nil)
+    return from ? INDICES.flat_map { |to| (tmp = dup.move_piece(from, to)) && !tmp.in_check? ? [[from, to]] : [] }
+    : piece_list(turn).flat_map { |p| @pieces[p].flat_map { |piece_from| possible_moves(piece_from) } }
   end
 end

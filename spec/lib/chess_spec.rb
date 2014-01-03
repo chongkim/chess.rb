@@ -77,7 +77,7 @@ describe Position do
   context "#move_piece" do
     it { expect(Position[R: e4].move_piece(e4,e2)).to eq Position[R: e2] }
     it { expect(Position[R: e4].move_piece(e4,d3)).to eq nil }
-    it { expect(Position[R: e4, P: e3].move_piece(e4,e2)).to eq nil } 
+    it { expect(Position[R: e4, P: e3].move_piece(e4,e2)).to eq nil }
     it { expect(Position[R: e4, P: e2].move_piece(e4,e2)).to eq nil }
     it { expect(Position[R: e4, p: e2].move_piece(e4,e2)).to eq Position[R: e2] }
     it { expect(Position[N: e4].move_piece(e4,c3)).to eq Position[N: c3] }
@@ -87,6 +87,7 @@ describe Position do
     it { expect(Position[b: e4].move_piece(e4,e5)).to eq nil }
     it { expect(Position[K: e4].move_piece(e4,e5)).to eq Position[K: e5] }
     it { expect(Position[K: e4].move_piece(e4,e6)).to eq nil }
+    it { expect(Position[K: e1, R: h1, :castling => [:Q, :k, :q]].move_piece(e1,g1)).to eq nil }
     it { expect(Position[P: e2].move_piece(e2,e3)).to eq Position[P: e3] }
     it { expect(Position[P: e2, r: e3].move_piece(e2,e3)).to eq nil }
     it { expect(Position[P: e2].move_piece(e2,e4)).to eq Position[P: e4, :ep => e3] }
@@ -98,10 +99,6 @@ describe Position do
     it { expect(Position[P: e5, p:f5, :ep => f6].move_piece(e5,f6)).to eq Position[P: f6] }
   end
 
-  context "#attacked" do
-    it { expect(Position.new.attacked(e1,:black)).to eq false }
-    it { expect(Position[K: e4, r: e1].attacked(e4, :black)).to eq true }
-  end
   context "#move" do
     context "e4" do
       subject { Position.new.move("e4") }
@@ -154,6 +151,16 @@ describe Position do
       its(:fullmove) { should == 3 }
     end
   end
+  context "#possible_moves" do
+    context "for a sq" do
+      subject { Position.new.possible_moves(g1) }
+      it { expect(subject).to eq [[g1, f3], [g1, h3]] }
+    end
+    context "all possible moves" do
+      subject { Position.new.possible_moves }
+      it { expect(subject).to include [e2,e4] }
+    end
+  end
   context "reads from pgn file" do
     it {
       File.open("games/Morphy.pgn", "r") do |f|
@@ -168,8 +175,7 @@ describe Position do
               game += 1
             else
               position.move(m)
-              puts
-              puts "Game #{game}", position, m
+              # puts "", "Game #{game}", position, m
             end
           end
         end

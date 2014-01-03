@@ -18,10 +18,13 @@ Symbol	lib/chess.rb	/^class Symbol$/;"	c
 _board	lib/chess.rb	/^  def _board; @board; end$/;"	f	class:Position
 _pieces	lib/chess.rb	/^  def _pieces; @pieces; end$/;"	f	class:Position
 color	lib/chess.rb	/^  def color$/;"	f	class:Symbol
+in_check?	lib/chess.rb	/^  def in_check?$/;"	f	class:Position
 initialize	lib/chess.rb	/^  def initialize(opts={})$/;"	f	class:Position
 initialize	lib/chess.rb	/^  def initialize(str,position)$/;"	f	class:IllegalMove
 initialize	lib/chess.rb	/^  def initialize(str,position,list)$/;"	f	class:AmbiguousMove
+initialize_copy	lib/chess.rb	/^  def initialize_copy(other)$/;"	f	class:Position
 inspect	lib/chess.rb	/^  def inspect$/;"	f	class:Position
+king?	lib/chess.rb	/^  def king?$/;"	f
 move	lib/chess.rb	/^  def move(str)$/;"	f	class:Position
 move_piece	lib/chess.rb	/^  def move_piece(from, to, act=true)$/;"	f	class:Position
 path_clear	lib/chess.rb	/^  def path_clear(from, to)$/;"	f	class:Position
