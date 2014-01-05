@@ -163,6 +163,7 @@ class Position
     if piece.king? && (to - from).abs == 2 then
       return nil if to == white(turn,g1,g8) && !castling.include?(white(turn,:K,:k))
       return nil if to == white(turn,c1,c8) && !castling.include?(white(turn,:Q,:q))
+      return nil if in_check? || (tmp = dup.move_piece(from, (from+to)/2)) && tmp.in_check?
     end
     if (!is_capture && piece.valid_move(from, to) ||
         is_capture && piece.valid_capture(from, to)) && path_clear(from, to) then
@@ -198,7 +199,12 @@ class Position
       @pieces[opponent].any? { |from| opponent.valid_capture(from, king_idx) && path_clear(from, king_idx) }
     }
   end
-  def move(str)
+  def move(*args)
+    if args.size == 1
+      str = *args
+    else
+      str = "%s-%s" % args.map { |e| e.to_sq }
+    end
     list = []
     promote = nil
     if m = str.match(/^(?<piece>[RNBQK])? (?<col>[a-h])?(?<row>[1-8])? x? (?<sq>[a-h][1-8]) (=(?<promote>[RNBQ]))? \+?$/x)
@@ -211,7 +217,6 @@ class Position
       list.select! { |from| (tmp = dup.move_piece(from, to)) && !tmp.in_check? }
       promote = m[:promote].send(white(turn,:upcase,:downcase)).to_sym if m[:promote]
     elsif str =~ /^O-O(-O)?$/
-      debugger
       piece = white(turn, :K, :k)
       list = [white(turn, e1, e8)]
       to = str == "O-O" ?  white(turn, g1, g8) : white(turn, c1, c8)
@@ -220,6 +225,7 @@ class Position
       list = [from]
       piece = self[from]
       to = $2.to_idx
+      return nil if move_piece(from, to, false).nil? || piece.color != turn
     end
     raise IllegalMove.new(str, self) if list.empty?
     raise AmbiguousMove.new(str, self, list) if 1 < list.size
@@ -238,5 +244,75 @@ class Position
   def possible_moves(from=nil)
     return from ? INDICES.flat_map { |to| (tmp = dup.move_piece(from, to)) && !tmp.in_check? ? [[from, to]] : [] }
     : piece_list(turn).flat_map { |p| @pieces[p].flat_map { |piece_from| possible_moves(piece_from) } }
+  end
+  def checkmate?
+    in_check? && possible_moves.empty?
+  end
+  def stalemate?
+    !in_check? && possible_moves.empty?
+  end
+  def draw?
+    100 <= halfmove
+  end
+  def game_end?
+    checkmate? || stalemate? || draw?
+  end
+  def evaluate
+    result = 0
+    result += @pieces[:R].size*5
+    result += @pieces[:N].size*3
+    result += @pieces[:B].size*3
+    result += @pieces[:Q].size*9
+    result -= @pieces[:r].size*5
+    result -= @pieces[:n].size*3
+    result -= @pieces[:b].size*3
+    result -= @pieces[:q].size*9
+    result
+  end
+  def minimax(depth=1, alpha=-999, beta=999)
+    @@cache ||= {}
+    @@node_count ||= 0
+    cache_value = @@cache[inspect]
+    if 100 < @@node_count then
+      print "x"
+      return white(turn,-999,999)
+    end
+    @@node_count += 1
+    if cache_value then
+      print "C"
+      return cache_value
+    elsif 3 < depth then
+      print "."
+      return evaluate
+    elsif checkmate? then
+      print "#"
+      return white(turn,-100,100)
+    elsif stalemate? || draw? then
+      print "0"
+      return 0
+    else
+      if turn == :white then
+        possible_moves.each do |mv|
+          alpha = [alpha, dup.move(*mv).minimax(depth + 1, alpha, beta)].max
+          break if beta <= alpha
+        end
+        value = alpha - depth
+        @@cache[inspect] = value
+        return value
+      else
+        possible_moves.each do |mv|
+          beta = [beta, dup.move(*mv).minimax(depth + 1, alpha, beta)].min
+          break if beta <= alpha
+        end
+        value = beta + depth
+        @@cache[inspect] = value
+        return value
+      end
+    end
+  end
+  def best_move
+    @@cache = {}
+    @@node_count = 0
+    possible_moves.send(white(turn, :max_by, :min_by)) { |mv| dup.move(*mv).minimax }
   end
 end

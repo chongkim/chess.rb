@@ -2,6 +2,9 @@ require "chess"
 
 include ChessHelper
 
+def xcontext(*args)
+end
+ 
 describe Fixnum do
   context "#to_sq" do
     it { expect(0.to_sq).to eq :a8 }
@@ -161,7 +164,29 @@ describe Position do
       it { expect(subject).to include [e2,e4] }
     end
   end
-  context "reads from pgn file" do
+  context "#checkmate?" do
+    it { expect(Position[K: e1, k: e3].checkmate?).to eq false }
+    it { expect(Position[K: e1, k: e3, q: e2].checkmate?).to eq true }
+    it { expect(Position[k: e1, K: e3, Q: e2, :turn => :black].checkmate?).to eq true }
+  end
+  context "#checkmate?" do
+    it { expect(Position[K: e1, k: e3].stalemate?).to eq false }
+    it { expect(Position[K: e1, k: e3, p: e2].stalemate?).to eq true }
+    it { expect(Position[k: e8, K: e6, P: e7, :turn => :black].stalemate?).to eq true }
+  end
+  context "#minimax" do
+    it { expect(Position[K: e1, k: e3, q: e2].minimax).to eq (-100) }
+    it { expect(Position[k: e1, K: e3, Q: e2, :turn => :black].minimax).to eq 100 }
+    it { expect(Position[K: e1, k: e3, p: e2].minimax).to eq 0 }
+    it { expect(Position[K: e1, k: e3, p: e2, :halfmove => 100].minimax).to eq 0 }
+    it { expect(Position[K: e1, k: e3, q: d3, :turn => :black].minimax).to eq (-99) }
+    it { expect(Position[k: e1, K: e3, Q: d3, :turn => :white].minimax).to eq 99 }
+  end
+  context "#best_move" do
+    it { expect(Position[K: e1, k: e3, q: d3, :turn => :black].best_move).to eq [d3, e2] }
+    it { expect(Position[k: e1, K: e3, Q: d3, :turn => :white].best_move).to eq [d3, e2] }
+  end
+  xcontext "reads from pgn file" do
     it {
       File.open("games/Morphy.pgn", "r") do |f|
         position = Position.new
