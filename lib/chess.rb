@@ -27,25 +27,33 @@ end
 
 class Position
   attr_accessor :board, :turn, :castling, :ep, :halfmove, :fullmove, :king
-  def initialize
-    @board = %w(- - - - - - - - - -
-                - - - - - - - - - -
-                - r n b q k b n r -
-                - p p p p p p p p -
-                - - - - - - - - - -
-                - - - - - - - - - -
-                - - - - - - - - - -
-                - - - - - - - - - -
-                - P P P P P P P P -
-                - R N B Q K B N R -
-                - - - - - - - - - -
-                - - - - - - - - - -).map { |c| c == "-" ? nil : c }
-    @turn = :white
-    @castling = "KQkq"
-    @ep = nil
-    @halfmove = 0
-    @fullmove = 1
-    @king = { white: e1, black: e8 }
+  def initialize(opts={})
+    if opts.keys.any? { |k| k.size == 1 }
+      @board = [nil]*(12*10)
+      opts.each do |p,idx|
+        next if p.size != 1
+        @board[idx] = p
+      end
+    else
+      @board = %w(- - - - - - - - - -
+                  - - - - - - - - - -
+                  - r n b q k b n r -
+                  - p p p p p p p p -
+                  - - - - - - - - - -
+                  - - - - - - - - - -
+                  - - - - - - - - - -
+                  - - - - - - - - - -
+                  - P P P P P P P P -
+                  - R N B Q K B N R -
+                  - - - - - - - - - -
+                  - - - - - - - - - -).map { |c| c == "-" ? nil : c }
+    end
+    @turn = opts[:turn] || :white
+    @castling = opts[:castling] || "KQkq"
+    @ep = opts[:ep]
+    @halfmove = opts[:halfmove] || 0
+    @fullmove = opts[:fullmove] || 1
+    @king = { white: @board.index("K"), black: @board.index("k") }
   end
   def initialize_copy(other)
     @board = other.board.dup
@@ -65,15 +73,12 @@ class Position
   def white(w,b,t=turn)
     t == :white ? w : b
   end
-  def bounded(idx)
-    21 <= idx && idx <= 98 && idx%10 != 0 && idx%10 != 9
-  end
   def find_repeat(piece, to, dirs, repeat)
     list = []
     dirs.each do |dir|
       if repeat
         from = to + dir
-        while bounded(from)
+        while 21 <= from && from <= 98 && from%10 != 0 && from%10 != 9
           list.push(from) if board[from] == piece
           break if board[from]
           from += dir
@@ -86,15 +91,15 @@ class Position
     list
   end
   def find(piece,to)
-    list = []
-    color = "RNBQKP".include?(piece) ? :white : :black
     case piece
-    when "N", "n" then list = find_repeat(piece, to, [-21,-19,-12,-8,8,12,19,21], false)
-    when "R", "r" then list = find_repeat(piece, to, [-10,-1,1,10], true)
-    when "K", "k" then list = find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], false)
-    when "Q", "q" then list = find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], true)
-    when "B", "b" then list = find_repeat(piece, to, [-11,-9,9,11], true)
+    when "N", "n" then find_repeat(piece, to, [-21,-19,-12,-8,8,12,19,21], false)
+    when "R", "r" then find_repeat(piece, to, [-10,-1,1,10], true)
+    when "K", "k" then find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], false)
+    when "Q", "q" then find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], true)
+    when "B", "b" then find_repeat(piece, to, [-11,-9,9,11], true)
     when "P", "p" then
+      list = []
+      color = piece == "P" ? :white : :black
       if board[to] || to == ep
         [11,9].each do |dir|
           from = to + white(dir,-dir,color)
@@ -106,8 +111,8 @@ class Position
         from = to + white(20,-20,color)
         list.push(from) if board[from] == piece && to/10 == white(6,5,color) && board[(to+from)/2] == nil
       end
+      list
     end
-    list
   end
   def in_check?
     white("rnbqkp","RNBQKP").chars.any? { |piece| !find(piece, king[turn]).empty? }
@@ -146,11 +151,17 @@ class Position
       castling.delete(white("Q","q"))
     end
     list.select! { |from|
-      tmp = dup
+      tmp = self
+      tmp_king = tmp.king[turn]
       tmp.king[turn] = to if "Kk".include?(piece)
+      tmp_piece = tmp.board[to]
       tmp.board[to] = tmp.board[from]
       tmp.board[from] = nil
-      !tmp.in_check?
+      is_in_check = tmp.in_check?
+      tmp.board[from] = tmp.board[to]
+      tmp.board[to] = tmp_piece
+      tmp.king[turn] = tmp_king
+      !is_in_check
     }
     raise IllegalMove.new(str,self,list) if list.size != 1
     from = list[0]
@@ -167,5 +178,18 @@ class Position
     end
     @turn = white(:black, :white)
     self
+  end
+  def possible_moves
+    list = []
+    pieces = white("RNBQKP", "rnbqkp")
+    [*0..7].each do |i|
+      [*0..7].each do |j|
+        to = i + 1 + (j + 2)*10
+        pieces.chars.each do |p|
+          list += find(p,to).map { |from| [from, to] }
+        end
+      end
+    end
+    list
   end
 end

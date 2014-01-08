@@ -1,5 +1,6 @@
 require "chess"
 require "debugger"
+require "ruby-prof"
 
 include ChessHelper
 
@@ -95,6 +96,7 @@ describe Position do
     end
     context "read moves from pgn" do
       it {
+        # RubyProf.start
         File.open("games/Morphy.pgn", "r") do |f|
           position = Position.new
           game = 1
@@ -112,7 +114,13 @@ describe Position do
             end
           end
         end
+        # RubyProf::FlatPrinter.new(RubyProf.stop).print(STDOUT)
       }
     end
+  end
+  context "#possible_moves" do
+    it { expect(Position.new("R" => e4).possible_moves).to eq [[65, 61], [65, 62], [65, 63], [65, 64], [65, 25], [65, 35], [65, 45], [65, 55], [65, 75], [65, 85], [65, 95], [65, 66], [65, 67], [65, 68]] }
+    it { expect(Position.new("B" => e4).possible_moves).to eq [[65, 21], [65, 32], [65, 92], [65, 43], [65, 83], [65, 54], [65, 74], [65, 56], [65, 76], [65, 47], [65, 87],
+ [65, 38], [65, 98]] }
   end
 end
