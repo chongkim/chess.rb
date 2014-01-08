@@ -64,6 +64,14 @@ class Position
     @fullmove = other.fullmove
     @king = other.king.dup
   end
+  def ==(other)
+    @board == other.board &&
+    @turn == other.turn &&
+    @castling == other.castling &&
+    @ep == other.ep &&
+    @halfmove == other.halfmove &&
+    @fullmove == other.fullmove
+  end
   def to_s
     b = @board.each_slice(10).to_a[2..9].map { |row| row[1..8].map { |s| s || "-" }.join(" ") }.join("\n")
     c = castling.empty? ? :- : castling
@@ -94,7 +102,15 @@ class Position
     case piece
     when "N", "n" then find_repeat(piece, to, [-21,-19,-12,-8,8,12,19,21], false)
     when "R", "r" then find_repeat(piece, to, [-10,-1,1,10], true)
-    when "K", "k" then find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], false)
+    when "K", "k" then
+      list = find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], false)
+      if @board[to].nil?
+        king_idx = king[turn]
+        if to == white(g1,g8) && king_idx == white(e1,e8) then
+          list.push(king_idx)
+        end
+      end
+      list
     when "Q", "q" then find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], true)
     when "B", "b" then find_repeat(piece, to, [-11,-9,9,11], true)
     when "P", "p" then
@@ -115,10 +131,19 @@ class Position
     end
   end
   def in_check?
+    return false if king[turn].nil?
     white("rnbqkp","RNBQKP").chars.any? { |piece| !find(piece, king[turn]).empty? }
   end
-  def move(str)
-    list = []
+  def move(*args)
+    if args.size == 1
+      str = args[0]
+      list = []
+    else
+      str = ""
+      list = [args[0]]
+      to = args[1]
+      piece = @board[list[0]]
+    end
     is_ep_capture = false
     is_capture = false
     if m = str.match(/^(?<piece>[RNBQK])? (?<col>[a-h])?(?<row>[1-8])? x?
@@ -191,5 +216,28 @@ class Position
       end
     end
     list
+  end
+  def evaluate
+    score = 0
+    score += @board.count("R")*5
+    score += @board.count("N")*3
+    score += @board.count("B")*3
+    score += @board.count("Q")*9
+    score += @board.count("P")*1
+    score -= @board.count("r")*5
+    score -= @board.count("n")*3
+    score -= @board.count("b")*3
+    score -= @board.count("q")*9
+    score -= @board.count("p")*1
+    score
+  end
+  def children
+    possible_moves.map { |from, to|
+      begin
+        dup.move(from, to)
+      rescue
+        nil
+      end
+    }.compact
   end
 end
