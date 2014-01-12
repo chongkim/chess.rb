@@ -18,6 +18,18 @@ class Fixnum
     (self%10 + 'a'.ord - 1).chr + ('8'.ord - self/10 + 2).chr
   end
 end
+class Symbol
+  def color
+    return @color unless @color.nil?
+    @color = :a < self ? :black : :white
+  end
+  def pawn?
+    self == :P || self == :p
+  end
+  def king?
+    self == :K || self == :k
+  end
+end
 
 class IllegalMove < Exception
   def initialize(str, position, list)
@@ -30,9 +42,12 @@ class Position
   def initialize(opts={})
     if opts.keys.any? { |k| k.size == 1 }
       @board = [nil]*(12*10)
-      opts.each do |p,idx|
+      opts.each do |p,idxs|
         next if p.size != 1
-        @board[idx] = p
+        idxs = [idxs] unless Array === idxs
+        idxs.each do |idx|
+          @board[idx] = p
+        end
       end
     else
       @board = %w(- - - - - - - - - -
@@ -46,15 +61,16 @@ class Position
                   - P P P P P P P P -
                   - R N B Q K B N R -
                   - - - - - - - - - -
-                  - - - - - - - - - -).map { |c| c == "-" ? nil : c }
+                  - - - - - - - - - -).map { |c| c == "-" ? nil : c.to_sym }
     end
     @turn = opts[:turn] || :white
     @castling = opts[:castling] || "KQkq"
     @ep = opts[:ep]
     @halfmove = opts[:halfmove] || 0
     @fullmove = opts[:fullmove] || 1
-    @king = { white: @board.index("K"), black: @board.index("k") }
+    @king = { white: @board.index(:K), black: @board.index(:k) }
   end
+
   def initialize_copy(other)
     @board = other.board.dup
     @turn = other.turn
@@ -64,6 +80,11 @@ class Position
     @fullmove = other.fullmove
     @king = other.king.dup
   end
+
+  def self.[](opts)
+    Position.new(opts)
+  end
+
   def ==(other)
     @board == other.board &&
     @turn == other.turn &&
@@ -72,15 +93,48 @@ class Position
     @halfmove == other.halfmove &&
     @fullmove == other.fullmove
   end
+
   def to_s
     b = @board.each_slice(10).to_a[2..9].map { |row| row[1..8].map { |s| s || "-" }.join(" ") }.join("\n")
     c = castling.empty? ? :- : castling
     e = ep.nil? ? :- : ep.to_sq
     "#{b} #{turn} #{c} #{e} #{halfmove} #{fullmove}"
   end
+
   def white(w,b,t=turn)
     t == :white ? w : b
   end
+
+  def move_str(from, to)
+    piece = board[from]
+    piece_str = piece.pawn? ? "" : piece
+    list = find(piece, to)
+    is_capture = board[to] || piece.pawn? && to == ep
+    if piece.pawn? && is_capture then
+      possible_pawn_pos = [*0..7].select { |row| board[from%10 + (row+2)*10] == piece }
+      possible_pawn_pos.select! { |row| target = board[to%10 + (row+2+white(-1,1))*10]; target && target.color != piece.color }
+      if possible_pawn_pos.size == 1 then
+        "#{from.to_sq[0]}#{to.to_sq[0]}"
+      else
+        "#{from.to_sq[0]}#{to.to_sq}"
+      end
+    elsif piece.king? && to - from == 2
+      "O-O"
+    elsif piece.king? && to - from == -2
+      "O-O-O"
+    else
+      if list.size == 1 then
+        "#{piece_str}#{to.to_sq}"
+      elsif list.select { |idx| idx%10 == from%10 }.size == 1
+        "#{piece_str}#{from.to_sq[0]}#{to.to_sq}"
+      elsif list.select { |idx| idx/10 == from/10 }.size == 1
+        "#{piece_str}#{from.to_sq[1]}#{to.to_sq}"
+      else
+        "#{piece_str}#{from.to_sq}#{to.to_sq}"
+      end
+    end
+  end
+
   def find_repeat(piece, to, dirs, repeat)
     list = []
     dirs.each do |dir|
@@ -98,11 +152,12 @@ class Position
     end
     list
   end
+
   def find(piece,to)
     case piece
-    when "N", "n" then find_repeat(piece, to, [-21,-19,-12,-8,8,12,19,21], false)
-    when "R", "r" then find_repeat(piece, to, [-10,-1,1,10], true)
-    when "K", "k" then
+    when :N, :n then find_repeat(piece, to, [-21,-19,-12,-8,8,12,19,21], false)
+    when :R, :r then find_repeat(piece, to, [-10,-1,1,10], true)
+    when :K, :k then
       list = find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], false)
       if @board[to].nil?
         king_idx = king[turn]
@@ -111,11 +166,11 @@ class Position
         end
       end
       list
-    when "Q", "q" then find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], true)
-    when "B", "b" then find_repeat(piece, to, [-11,-9,9,11], true)
-    when "P", "p" then
+    when :Q, :q then find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], true)
+    when :B, :b then find_repeat(piece, to, [-11,-9,9,11], true)
+    when :P, :p then
       list = []
-      color = piece == "P" ? :white : :black
+      color = piece == :P ? :white : :black
       if board[to] || to == ep
         [11,9].each do |dir|
           from = to + white(dir,-dir,color)
@@ -130,10 +185,12 @@ class Position
       list
     end
   end
+
   def in_check?
     return false if king[turn].nil?
-    white("rnbqkp","RNBQKP").chars.any? { |piece| !find(piece, king[turn]).empty? }
+    white([:r,:n,:b,:q,:k,:p],[:R,:N,:B,:Q,:K,:P]).any? { |piece| !find(piece, king[turn]).empty? }
   end
+
   def move(*args)
     if args.size == 1
       str = args[0]
@@ -150,25 +207,27 @@ class Position
                      (?<sq>[a-h][1-8]) (=(?<promote>[RNBQ]))? \+?$/x) then
       piece = m[:piece] || "P"
       piece.downcase! if turn == :black
+      piece = piece.to_sym
       promote = m[:promote] if m[:promote]
       promote.downcase! if promote && turn == :black
+      promote = promote.to_sym if promote
       to = m[:sq].to_idx
       col = m[:col].ord - 'a'.ord + 1 if m[:col]
       row = '8'.ord - m[:row].ord + 2 if m[:row]
       list = find(piece,to)
       list.select! { |from| from%10 == col } if col
       list.select! { |from| from/10 == row } if row
-      is_ep_capture = "Pp".include?(piece) && to == ep
+      is_ep_capture = piece.pawn? && to == ep
       is_capture = board[to] || is_ep_capture
     elsif str == "O-O" && castling.include?(white("K","k"))
-      piece = white("K", "k")
+      piece = white(:K, :k)
       to = white(g1,g8)
       list.push(white(e1,e8))
       board[white(f1,f8)] = board[white(h1,h8)]
       board[white(h1,h8)] = nil
       castling.delete(white("K","k"))
     elsif str == "O-O-O" && castling.include?(white("Q","q"))
-      piece = white("K", "k")
+      piece = white(:K, :k)
       to = white(c1,c8)
       list.push(white(e1,e8))
       board[white(d1,d8)] = board[white(a1,a8)]
@@ -178,7 +237,7 @@ class Position
     list.select! { |from|
       tmp = self
       tmp_king = tmp.king[turn]
-      tmp.king[turn] = to if "Kk".include?(piece)
+      tmp.king[turn] = to if piece.king?
       tmp_piece = tmp.board[to]
       tmp.board[to] = tmp.board[from]
       tmp.board[from] = nil
@@ -190,13 +249,13 @@ class Position
     }
     raise IllegalMove.new(str,self,list) if list.size != 1
     from = list[0]
-    @king[turn] = to if "Kk".include?(piece)
+    @king[turn] = to if piece.king?
     board[ep + white(10,-10)] = nil if is_ep_capture
-    @ep = "Pp".include?(piece) && to - from == white(-20,20) ? (to+from)/2 : nil
+    @ep = piece.pawn? && to - from == white(-20,20) ? (to+from)/2 : nil
     board[to] = promote || board[from]
     board[from] = nil
     @fullmove += 1 if turn == :black
-    if "Pp".include?(piece) || is_capture then
+    if piece .pawn?|| is_capture then
       @halfmove = 0
     else
       @halfmove += 1
@@ -204,33 +263,40 @@ class Position
     @turn = white(:black, :white)
     self
   end
+
   def possible_moves
     list = []
-    pieces = white("RNBQKP", "rnbqkp")
+    pieces = white([:R,:N,:B,:Q,:K,:P], [:r,:n,:b,:q,:k,:p])
     [*0..7].each do |i|
       [*0..7].each do |j|
         to = i + 1 + (j + 2)*10
-        pieces.chars.each do |p|
+        pieces.each do |p|
           list += find(p,to).map { |from| [from, to] }
         end
       end
     end
     list
   end
+
+  def possible_moves_str
+    possible_moves.map { |from, to| move_str(from, to) }
+  end
+
   def evaluate
     score = 0
-    score += @board.count("R")*5
-    score += @board.count("N")*3
-    score += @board.count("B")*3
-    score += @board.count("Q")*9
-    score += @board.count("P")*1
-    score -= @board.count("r")*5
-    score -= @board.count("n")*3
-    score -= @board.count("b")*3
-    score -= @board.count("q")*9
-    score -= @board.count("p")*1
+    score += @board.count(:R)*5
+    score += @board.count(:N)*3
+    score += @board.count(:B)*3
+    score += @board.count(:Q)*9
+    score += @board.count(:P)*1
+    score -= @board.count(:r)*5
+    score -= @board.count(:n)*3
+    score -= @board.count(:b)*3
+    score -= @board.count(:q)*9
+    score -= @board.count(:p)*1
     score
   end
+
   def children
     possible_moves.map { |from, to|
       begin

@@ -4,19 +4,29 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.8	//
+==	lib/chess.rb	/^  def ==(other)$/;"	f	class:Position
 ChessHelper	lib/chess.rb	/^module ChessHelper$/;"	m
 Fixnum	lib/chess.rb	/^class Fixnum$/;"	c
 IllegalMove	lib/chess.rb	/^class IllegalMove < Exception$/;"	c
 Position	lib/chess.rb	/^class Position$/;"	c
 String	lib/chess.rb	/^class String$/;"	c
+Symbol	lib/chess.rb	/^class Symbol$/;"	c
+[]	lib/chess.rb	/^  def self.[](opts)$/;"	F	class:Position
+children	lib/chess.rb	/^  def children$/;"	f	class:Position
+color	lib/chess.rb	/^  def color$/;"	f	class:Symbol
+evaluate	lib/chess.rb	/^  def evaluate$/;"	f	class:Position
 find	lib/chess.rb	/^  def find(piece,to)$/;"	f	class:Position
 find_repeat	lib/chess.rb	/^  def find_repeat(piece, to, dirs, repeat)$/;"	f	class:Position
 in_check?	lib/chess.rb	/^  def in_check?$/;"	f	class:Position
 initialize	lib/chess.rb	/^  def initialize(opts={})$/;"	f	class:Position
 initialize	lib/chess.rb	/^  def initialize(str, position, list)$/;"	f	class:IllegalMove
 initialize_copy	lib/chess.rb	/^  def initialize_copy(other)$/;"	f	class:Position
-move	lib/chess.rb	/^  def move(str)$/;"	f	class:Position
+king?	lib/chess.rb	/^  def king?$/;"	f	class:Symbol
+move	lib/chess.rb	/^  def move(*args)$/;"	f	class:Position
+move_str	lib/chess.rb	/^  def move_str(from, to)$/;"	f	class:Position
+pawn?	lib/chess.rb	/^  def pawn?$/;"	f	class:Symbol
 possible_moves	lib/chess.rb	/^  def possible_moves$/;"	f	class:Position
+possible_moves_str	lib/chess.rb	/^  def possible_moves_str$/;"	f	class:Position
 to_idx	lib/chess.rb	/^  def to_idx$/;"	f	class:String
 to_s	lib/chess.rb	/^  def to_s$/;"	f	class:Position
 to_sq	lib/chess.rb	/^  def to_sq$/;"	f	class:Fixnum
