@@ -64,11 +64,20 @@ class Position
                   - - - - - - - - - -).map { |c| c == "-" ? nil : c.to_sym }
     end
     @turn = opts[:turn] || :white
-    @castling = opts[:castling] || "KQkq"
+    @castling = opts[:castling] || castling_default
     @ep = opts[:ep]
     @halfmove = opts[:halfmove] || 0
     @fullmove = opts[:fullmove] || 1
     @king = { white: @board.index(:K), black: @board.index(:k) }
+  end
+
+  def castling_default
+    str = ""
+    str += "K" if board[e1] == :K && board[h1] == :R
+    str += "Q" if board[e1] == :K && board[a1] == :R
+    str += "k" if board[e8] == :k && board[h8] == :r
+    str += "q" if board[e8] == :k && board[a8] == :r
+    str
   end
 
   def initialize_copy(other)
@@ -86,12 +95,21 @@ class Position
   end
 
   def ==(other)
+    self.class == other.class &&
     @board == other.board &&
     @turn == other.turn &&
     @castling == other.castling &&
     @ep == other.ep &&
     @halfmove == other.halfmove &&
     @fullmove == other.fullmove
+  end
+
+  def inspect
+    b = @board.each_slice(10).to_a[2..9].map { |row| row[1..8].map { |s| s || "-" }.join.gsub(/-+/) { |s| s.size } }.join("/")
+    t = white(:w,:b)
+    c = castling.empty? ? :- : castling
+    e = ep.nil? ? :- : ep.to_sq
+    "#{b} #{t} #{c} #{e} #{halfmove} #{fullmove}"
   end
 
   def to_s
@@ -105,18 +123,31 @@ class Position
     t == :white ? w : b
   end
 
-  def move_str(from, to)
+  def promote_str(promote)
+    if promote
+      "=#{promote}"
+    else
+      ""
+    end
+  end
+
+  def move_str(from, to, promote=nil)
     piece = board[from]
-    piece_str = piece.pawn? ? "" : piece
+    piece_str = piece.pawn? ? "" : piece.to_s
+    piece_str.upcase! if piece.color == :black
     list = find(piece, to)
     is_capture = board[to] || piece.pawn? && to == ep
     if piece.pawn? && is_capture then
       possible_pawn_pos = [*0..7].select { |row| board[from%10 + (row+2)*10] == piece }
-      possible_pawn_pos.select! { |row| target = board[to%10 + (row+2+white(-1,1))*10]; target && target.color != piece.color }
+      possible_pawn_pos.select! { |row|
+        target = board[to%10 + (row+2+white(-1,1))*10];
+        target && target.color != piece.color ||
+          piece.pawn? && to == ep && row+2 == from/10
+      }
       if possible_pawn_pos.size == 1 then
-        "#{from.to_sq[0]}#{to.to_sq[0]}"
+        "#{from.to_sq[0]}#{to.to_sq[0]}#{promote_str(promote)}"
       else
-        "#{from.to_sq[0]}#{to.to_sq}"
+        "#{from.to_sq[0]}#{to.to_sq}#{promote_str(promote)}"
       end
     elsif piece.king? && to - from == 2
       "O-O"
@@ -124,13 +155,13 @@ class Position
       "O-O-O"
     else
       if list.size == 1 then
-        "#{piece_str}#{to.to_sq}"
+        "#{piece_str}#{to.to_sq}#{promote_str(promote)}"
       elsif list.select { |idx| idx%10 == from%10 }.size == 1
-        "#{piece_str}#{from.to_sq[0]}#{to.to_sq}"
+        "#{piece_str}#{from.to_sq[0]}#{to.to_sq}#{promote_str(promote)}"
       elsif list.select { |idx| idx/10 == from/10 }.size == 1
-        "#{piece_str}#{from.to_sq[1]}#{to.to_sq}"
+        "#{piece_str}#{from.to_sq[1]}#{to.to_sq}#{promote_str(promote)}"
       else
-        "#{piece_str}#{from.to_sq}#{to.to_sq}"
+        "#{piece_str}#{from.to_sq}#{to.to_sq}#{promote_str(promote)}"
       end
     end
   end
@@ -161,8 +192,12 @@ class Position
       list = find_repeat(piece, to, [-11,-10,-9,-1,1,9,10,11], false)
       if @board[to].nil?
         king_idx = king[turn]
-        if to == white(g1,g8) && king_idx == white(e1,e8) then
-          list.push(king_idx)
+        if king_idx == white(e1,e8) && (to - king_idx).abs == 2
+          if to == white(g1,g8) && castling.include?(white("K", "k")) then
+            list.push(king_idx) if board[white(f1,f8)].nil? && board[white(g1,g8)].nil?
+          elsif to == white(c1,c8) && castling.include?(white("Q", "q")) then
+            list.push(king_idx) if board[white(b1,b8)].nil? && board[white(c1,c8)].nil? && board[white(d1,d8)].nil?
+          end
         end
       end
       list
@@ -199,6 +234,7 @@ class Position
       str = ""
       list = [args[0]]
       to = args[1]
+      promote = args[2]
       piece = @board[list[0]]
     end
     is_ep_capture = false
@@ -271,7 +307,27 @@ class Position
       [*0..7].each do |j|
         to = i + 1 + (j + 2)*10
         pieces.each do |p|
-          list += find(p,to).map { |from| [from, to] }
+          list += find(p,to).flat_map { |from|
+            begin
+              dup.move(from, to)
+              if p.king? && (to - from).abs == 2 && dup.move(from, (to+from)/2).in_check?
+                raise IllegalMove.new("",self,[])
+              end
+              result = []
+              item = [from, to] unless (board[to] && board[to].color == p.color ||
+                                          p.king? && (to - from).abs == 2 && in_check?)
+              if item && p.pawn? && to/10 == white(2,9)
+                result = white([:R,:N,:B,:Q],[:r,:n,:b,:q]).map { |promote|
+                  [from, to, promote]
+                }
+              else
+                result = [item]
+              end
+              result
+            rescue IllegalMove
+              nil
+            end
+          }.compact
         end
       end
     end
@@ -279,7 +335,7 @@ class Position
   end
 
   def possible_moves_str
-    possible_moves.map { |from, to| move_str(from, to) }
+    possible_moves.map { |from, to, promote| move_str(from, to, promote) }
   end
 
   def evaluate
