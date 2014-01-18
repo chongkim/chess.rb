@@ -29,6 +29,13 @@ describe Fixnum do
     it { expect(98.to_sq).to eq "h1" }
   end
 end
+describe Array do
+  context "to_idx" do
+    it { expect([0,0].to_idx).to eq a8 }
+    it { expect([1,0].to_idx).to eq b8 }
+    it { expect([0,1].to_idx).to eq a7 }
+  end
+end
 
 describe Position do
   context ".new" do
@@ -204,5 +211,28 @@ describe Position do
       expect(Position[P: e7, r: d8].possible_moves_str.sort).to eq \
         ["e8=B", "e8=N", "e8=Q", "e8=R", "ed=B", "ed=N", "ed=Q", "ed=R"]
     end
+  end
+
+  context "#checkmate?" do
+    it { expect(Position.new.checkmate?).to eq false }
+    it { expect(Position[K: e1, q: e2, k: e3].checkmate?).to eq true }
+    it { expect(Position[K: e1, q: e2, k: e8].checkmate?).to eq false }
+  end
+  context "#stale?" do
+    it { expect(Position.new.stalemate?).to eq false }
+    it { expect(Position[K: e1, p: e2, k: e3].stalemate?).to eq true }
+    it { expect(Position[K: e1, p: e2, k: e8].stalemate?).to eq false }
+  end
+
+  context "#minimax" do
+    it { expect(Position[K: e1, q: e2, k: e3].minimax).to eq (-100) }
+    it { expect(Position[k: e1, Q: e2, K: e3, :turn => :black].minimax).to eq (100) }
+    it { expect(Position[K: e1, p: e2, k: e3].minimax).to eq 0 }
+    it { expect(Position[K: e1, q: d3, k: e3, :turn => :black].minimax).to eq (-99) }
+    it { expect(Position[k: e1, Q: d3, K: e3, :turn => :white].minimax).to eq 99 }
+  end
+
+  context "#best_move" do
+    it { expect(Position[K: e1, q: d3, k: e3, b: b1, :turn => :black].best_move).to eq [d3,e2] }
   end
 end

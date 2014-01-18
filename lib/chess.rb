@@ -8,6 +8,11 @@ module ChessHelper
   end
 end
 
+class Array
+  def to_idx
+    self[0] + 1 + (self[1] + 2)*10
+  end
+end
 class String
   def to_idx
     self[0].ord - 'a'.ord + 1 + ('8'.ord - self[1].ord + 2)*10
@@ -38,6 +43,7 @@ class IllegalMove < Exception
 end
 
 class Position
+  include ChessHelper
   attr_accessor :board, :turn, :castling, :ep, :halfmove, :fullmove, :king
   def initialize(opts={})
     if opts.keys.any? { |k| k.size == 1 }
@@ -361,5 +367,48 @@ class Position
         nil
       end
     }.compact
+  end
+
+  def checkmate?
+    in_check? && possible_moves.empty?
+  end
+
+  def stalemate?
+    !in_check? && possible_moves.empty?
+  end
+
+  def draw?
+    stalemate? || !checkmate? && halfmove >= 100
+  end
+
+  def evaluate
+    score = 0
+    score += board.count(:R)*5
+    score += board.count(:N)*3
+    score += board.count(:B)*3
+    score += board.count(:Q)*9
+    score += board.count(:P)*1
+    score -= board.count(:r)*5
+    score -= board.count(:n)*3
+    score -= board.count(:b)*3
+    score -= board.count(:q)*9
+    score -= board.count(:p)*1
+    score
+  end
+
+  def minimax(depth=1)
+    if checkmate? then
+      return white(-100,100)
+    elsif draw?
+      return 0
+    elsif depth > 2
+      return evaluate
+    end
+    values = possible_moves.map { |mv| dup.move(*mv).minimax(depth+1) }.compact
+    values.send(white(:max,:min)) + white(-depth,+depth) unless values.empty?
+  end
+
+  def best_move
+    possible_moves.send(white(:max_by, :min_by)) { |mv| dup.move(*mv).minimax }
   end
 end
