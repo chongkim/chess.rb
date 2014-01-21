@@ -5,6 +5,8 @@
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.8	//
 ==	lib/chess.rb	/^  def ==(other)$/;"	f	class:Position
+Array	lib/chess.rb	/^class Array$/;"	c
+Chess	chess.rb	/^class Chess < Gosu::Window$/;"	c
 ChessHelper	lib/chess.rb	/^module ChessHelper$/;"	m
 Fixnum	lib/chess.rb	/^class Fixnum$/;"	c
 IllegalMove	lib/chess.rb	/^class IllegalMove < Exception$/;"	c
@@ -12,22 +14,38 @@ Position	lib/chess.rb	/^class Position$/;"	c
 String	lib/chess.rb	/^class String$/;"	c
 Symbol	lib/chess.rb	/^class Symbol$/;"	c
 []	lib/chess.rb	/^  def self.[](opts)$/;"	F	class:Position
+best_move	lib/chess.rb	/^  def best_move$/;"	f	class:Position
+button_down	chess.rb	/^  def button_down(id)$/;"	f	class:Chess
+button_up	chess.rb	/^  def button_up(id)$/;"	f	class:Chess
+castling_default	lib/chess.rb	/^  def castling_default$/;"	f	class:Position
+checkmate?	lib/chess.rb	/^  def checkmate?$/;"	f	class:Position
 children	lib/chess.rb	/^  def children$/;"	f	class:Position
 color	lib/chess.rb	/^  def color$/;"	f	class:Symbol
+draw	chess.rb	/^  def draw$/;"	f	class:Chess
 evaluate	lib/chess.rb	/^  def evaluate$/;"	f	class:Position
 find	lib/chess.rb	/^  def find(piece,to)$/;"	f	class:Position
 find_repeat	lib/chess.rb	/^  def find_repeat(piece, to, dirs, repeat)$/;"	f	class:Position
+game_end?	lib/chess.rb	/^  def game_end?$/;"	f	class:Position
+get_idx	chess.rb	/^  def get_idx$/;"	f	class:Chess
 in_check?	lib/chess.rb	/^  def in_check?$/;"	f	class:Position
+initialize	chess.rb	/^  def initialize$/;"	f	class:Chess
 initialize	lib/chess.rb	/^  def initialize(opts={})$/;"	f	class:Position
 initialize	lib/chess.rb	/^  def initialize(str, position, list)$/;"	f	class:IllegalMove
 initialize_copy	lib/chess.rb	/^  def initialize_copy(other)$/;"	f	class:Position
+inspect	lib/chess.rb	/^  def inspect$/;"	f	class:Position
 king?	lib/chess.rb	/^  def king?$/;"	f	class:Symbol
+minimax	lib/chess.rb	/^  def minimax(depth=1)$/;"	f	class:Position
 move	lib/chess.rb	/^  def move(*args)$/;"	f	class:Position
-move_str	lib/chess.rb	/^  def move_str(from, to)$/;"	f	class:Position
+move_str	lib/chess.rb	/^  def move_str(from, to, promote=nil)$/;"	f	class:Position
+needs_cursor?	chess.rb	/^  def needs_cursor?$/;"	f	class:Chess
 pawn?	lib/chess.rb	/^  def pawn?$/;"	f	class:Symbol
 possible_moves	lib/chess.rb	/^  def possible_moves$/;"	f	class:Position
 possible_moves_str	lib/chess.rb	/^  def possible_moves_str$/;"	f	class:Position
+promote_str	lib/chess.rb	/^  def promote_str(promote)$/;"	f	class:Position
+stalemate?	lib/chess.rb	/^  def stalemate?$/;"	f	class:Position
+to_idx	lib/chess.rb	/^  def to_idx$/;"	f	class:Array
 to_idx	lib/chess.rb	/^  def to_idx$/;"	f	class:String
 to_s	lib/chess.rb	/^  def to_s$/;"	f	class:Position
 to_sq	lib/chess.rb	/^  def to_sq$/;"	f	class:Fixnum
+update	chess.rb	/^  def update$/;"	f	class:Chess
 white	lib/chess.rb	/^  def white(w,b,t=turn)$/;"	f	class:Position

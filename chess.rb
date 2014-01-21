@@ -2,7 +2,7 @@ require "gosu"
 require "./lib/chess.rb"
 
 class Chess < Gosu::Window
-  attr_accessor :width, :height, :cwidth, :position, :font, :from, :to
+  attr_accessor :width, :height, :cwidth, :position, :font, :from, :to, :player
   PIECES = {R: '♖', N: '♘', B: '♗', Q: '♕',K: '♔',P:'♙',r:'♜',n:'♞',b:'♝',q:'♛',k:'♚',p: '♟'}
   def initialize
     @cwidth = 100
@@ -31,7 +31,22 @@ class Chess < Gosu::Window
       @to = get_idx
       if position.possible_moves.include?([from, to])
         position.move(from, to)
+        @player = :computer_wait
       end
+    end
+  end
+
+  def update
+    case player
+    when :computer_wait then @player = :computer
+    when :computer then
+      if !position.game_end? then
+        puts "computer starts"
+        best = position.best_move
+        position.move(*best)
+        puts "comptuer ends"
+      end
+      @player = :human
     end
   end
 

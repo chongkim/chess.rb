@@ -238,10 +238,26 @@ class Position
       list = []
     else
       str = ""
-      list = [args[0]]
+      from = args[0]
+      list = [from]
       to = args[1]
       promote = args[2]
       piece = @board[list[0]]
+      if piece.king? then
+        if to - from == 2 then
+          @board[white(f1,f8)] = @board[white(h1,h8)]
+          @board[white(h1,h8)] = nil
+        end
+        if to - from == -2 then
+          @board[white(d1,d8)] = @board[white(a1,a8)]
+          @board[white(a1,a8)] = nil
+        end
+        castling.delete!(white("K","k"))
+        castling.delete!(white("Q","q"))
+      end
+      if piece.pawn? && to == ep then
+        @board[ep + white(10,-10)] = nil
+      end
     end
     is_ep_capture = false
     is_capture = false
@@ -257,8 +273,8 @@ class Position
       col = m[:col].ord - 'a'.ord + 1 if m[:col]
       row = '8'.ord - m[:row].ord + 2 if m[:row]
       list = find(piece,to)
-      list.select! { |from| from%10 == col } if col
-      list.select! { |from| from/10 == row } if row
+      list.select! { |_from| _from%10 == col } if col
+      list.select! { |_from| _from/10 == row } if row
       is_ep_capture = piece.pawn? && to == ep
       is_capture = board[to] || is_ep_capture
     elsif str == "O-O" && castling.include?(white("K","k"))
@@ -276,15 +292,15 @@ class Position
       board[white(a1,a8)] = nil
       castling.delete(white("Q","q"))
     end
-    list.select! { |from|
+    list.select! { |_from|
       tmp = self
       tmp_king = tmp.king[turn]
       tmp.king[turn] = to if piece.king?
       tmp_piece = tmp.board[to]
-      tmp.board[to] = tmp.board[from]
-      tmp.board[from] = nil
+      tmp.board[to] = tmp.board[_from]
+      tmp.board[_from] = nil
       is_in_check = tmp.in_check?
-      tmp.board[from] = tmp.board[to]
+      tmp.board[_from] = tmp.board[to]
       tmp.board[to] = tmp_piece
       tmp.king[turn] = tmp_king
       !is_in_check
@@ -344,21 +360,6 @@ class Position
     possible_moves.map { |from, to, promote| move_str(from, to, promote) }
   end
 
-  def evaluate
-    score = 0
-    score += @board.count(:R)*5
-    score += @board.count(:N)*3
-    score += @board.count(:B)*3
-    score += @board.count(:Q)*9
-    score += @board.count(:P)*1
-    score -= @board.count(:r)*5
-    score -= @board.count(:n)*3
-    score -= @board.count(:b)*3
-    score -= @board.count(:q)*9
-    score -= @board.count(:p)*1
-    score
-  end
-
   def children
     possible_moves.map { |from, to|
       begin
@@ -377,10 +378,6 @@ class Position
     !in_check? && possible_moves.empty?
   end
 
-  def draw?
-    stalemate? || !checkmate? && halfmove >= 100
-  end
-
   def evaluate
     score = 0
     score += board.count(:R)*5
@@ -393,13 +390,24 @@ class Position
     score -= board.count(:b)*3
     score -= board.count(:q)*9
     score -= board.count(:p)*1
+    if fullmove < 10 then
+      [e4,e5,d4,d5].each do |idx|
+        [:R,:N,:B,:Q,:K,:P].each { |p| score += find(p,idx).size * 0.1 }
+        [:r,:n,:b,:q,:k,:p].each { |p| score -= find(p,idx).size * 0.1 }
+      end
+    else
+      white_king_idx = board.index(:K)
+      black_king_idx = board.index(:k)
+      [:r,:n,:b,:q,:k,:p].each { |p| score -= find(p,white_king_idx).size * 0.1 } if white_king_idx
+      [:R,:N,:B,:Q,:K,:P].each { |p| score += find(p,black_king_idx).size * 0.1 } if black_king_idx
+    end
     score
   end
 
   def minimax(depth=1)
     if checkmate? then
       return white(-100,100)
-    elsif draw?
+    elsif possible_moves.empty? || halfmove >= 100
       return 0
     elsif depth > 2
       return evaluate
@@ -410,5 +418,9 @@ class Position
 
   def best_move
     possible_moves.send(white(:max_by, :min_by)) { |mv| dup.move(*mv).minimax }
+  end
+
+  def game_end?
+    checkmate? || possible_moves.empty? || halfmove >= 100
   end
 end

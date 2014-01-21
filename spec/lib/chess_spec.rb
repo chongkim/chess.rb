@@ -133,6 +133,21 @@ describe Position do
     end
     context "two args" do
       it { expect(Position[R: e4].move(e4, e2)).to eq Position[R: e2, :turn => :black, :halfmove => 1] }
+      it "removes castling if the king is moved" do
+        expect(Position[K: e1, R: [a1, h1]].move(e1, e2)).to eq \
+          Position[K: e2, R: [a1, h1], :castling => "", :turn => :black, :halfmove => 1]
+      end
+      it "castles kingside" do
+        expect(Position[K: e1, R: h1].move(e1,g1)).to eq \
+          Position[K: g1, R: f1, :castling => "", :turn => :black, :halfmove => 1]
+      end
+      it "castles queenside" do
+        expect(Position[K: e1, R: a1].move(e1,c1)).to eq \
+          Position[K: c1, R: d1, :castling => "", :turn => :black, :halfmove => 1]
+      end
+      it "handles en passant" do
+        expect(Position[P: e5, p: f5, :ep => f6].move(e5, f6)).to eq Position[P: f6, :turn => :black]
+      end
     end
     context "pawn promotion" do
       it { expect(Position[P: e7].move(e7, e8, :Q)).to eq Position[Q: e8, :turn => :black] }
@@ -218,7 +233,7 @@ describe Position do
     it { expect(Position[K: e1, q: e2, k: e3].checkmate?).to eq true }
     it { expect(Position[K: e1, q: e2, k: e8].checkmate?).to eq false }
   end
-  context "#stale?" do
+  context "#stalemate?" do
     it { expect(Position.new.stalemate?).to eq false }
     it { expect(Position[K: e1, p: e2, k: e3].stalemate?).to eq true }
     it { expect(Position[K: e1, p: e2, k: e8].stalemate?).to eq false }
@@ -234,5 +249,11 @@ describe Position do
 
   context "#best_move" do
     it { expect(Position[K: e1, q: d3, k: e3, b: b1, :turn => :black].best_move).to eq [d3,e2] }
+  end
+
+  context "#game_end?" do
+    it { expect(Position.new.game_end?).to eq false }
+    it { expect(Position[k: e1, Q: e2, K: e3, :turn => :black].game_end?).to eq true }
+    it { expect(Position[K: e1, p: e2, k: e3].game_end?).to eq true }
   end
 end
